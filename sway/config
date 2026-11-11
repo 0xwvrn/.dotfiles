@@ -145,6 +145,11 @@ bindgesture swipe:3:left workspace next
     for_window [app_id="^.*"] border pixel 0
     for_window [class="^.*"] border pixel 0
     for_window [app_id="tui-settings"] floating enable, resize set 800 520, move position center
+    for_window [app_id="dropdown-term"] floating enable, resize set 900 520, move position center, move scratchpad
+    for_window [app_id="floating-notes"] floating enable, resize set 850 560, move position center
+    for_window [app_id="floating-finder"] floating enable, resize set 1000 620, move position center
+    for_window [app_id="floating-weather"] floating enable, resize set 850 580, move position center
+    for_window [app_id="tui-monitor"] floating enable, resize set 1000 620, move position center
     # Automatically route Apple Music in Zen to workspace 3
     for_window [app_id="zen" title=".*Apple.*Music.*"] move container to workspace number 3
     # You can "split" the current object of your focus with
@@ -236,6 +241,18 @@ bindsym $mod+r mode "resize"
     # Searchable clipboard history
     bindsym $mod+c exec ~/.local/bin/clipboard-menu
 
+    # Instant dropdown scratchpad terminal
+    bindsym $mod+grave exec ~/.local/bin/toggle-dropdown
+
+    # Quick floating scratchpad notes
+    bindsym $mod+n exec kitty --app-id floating-notes -e ~/.local/bin/quick-notes
+
+    # Interactive fuzzy file & code finder
+    bindsym $mod+Shift+f exec kitty --app-id floating-finder -e ~/.local/bin/finder
+
+    # System Monitor (btop / htop)
+    bindsym $mod+Shift+m exec kitty --app-id tui-monitor -e btop
+
     # Wallpaper & dynamic color switcher
     bindsym $mod+Shift+w exec ~/.local/bin/change-wallpaper --select
     bindsym $mod+Ctrl+w exec ~/.local/bin/change-wallpaper --random
@@ -260,6 +277,9 @@ exec ~/.local/bin/change-wallpaper --restore
 
 # Automated workspace setup on login
 exec ~/.local/bin/sway-startup
+
+# Night Light / Blue light filter (gammastep)
+exec which gammastep >/dev/null 2>&1 && gammastep
 
 # Clipboard history watcher (if wl-clipboard and cliphist are installed)
 exec which cliphist >/dev/null 2>&1 && wl-paste --watch cliphist store

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# ~/.local/bin/toggle-dropdown: Toggle instant dropdown scratchpad terminal in Sway
+
+if ! swaymsg '[app_id="dropdown-term"] scratchpad show' >/dev/null 2>&1; then
+    kitty --app-id dropdown-term &
+fi

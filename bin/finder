@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# ~/.local/bin/finder: Instant interactive file & code search tool
+# Powered by fzf, ripgrep, and bat/cat
+
+set -e
+
+# Load pywal colors for fzf if available
+if [ -f "$HOME/.cache/wal/colors-fzf.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.cache/wal/colors-fzf.sh"
+fi
+
+PREVIEW_CMD='if command -v bat >/dev/null 2>&1; then bat --style=plain --color=always --line-range :100 {}; else head -n 100 {}; fi'
+
+find_files() {
+    local target
+    target=$(find "$HOME" -maxdepth 4 \
+        -not -path '*/.*' \
+        -not -path '*/node_modules/*' \
+        -not -path '*/venv/*' \
+        -not -path '*/build/*' \
+        -type f 2>/dev/null | \
+        fzf --prompt="Open File > " \
+            --layout=reverse \
+            --border \
+            --preview="$PREVIEW_CMD" \
+            --preview-window=right:60%)
+
+    if [ -n "$target" ]; then
+        exec nvim "$target"
+    fi
+}
+
+grep_code() {
+    local initial_query="${1:-}"
+    local selected
+    selected=$(rg --column --line-number --no-heading --color=always --smart-case "$initial_query" 2>/dev/null | \
+        fzf --ansi \
+            --prompt="Ripgrep Code > " \
+            --layout=reverse \
+            --border \
+            --delimiter : \
+            --preview 'bat --style=plain --color=always {1} --highlight-line {2} 2>/dev/null || sed -n "{2}p" {1}' \
+            --preview-window=right:60% || true)
+
+    if [ -n "$selected" ]; then
+        local file line
+        file=$(echo "$selected" | cut -d: -f1)
+        line=$(echo "$selected" | cut -d: -f2)
+        exec nvim "+$line" "$file"
+    fi
+}
+
+# Main menu
+choice=$(printf "%s\n%s\n%s" \
+    "󰈞  Find File by Name (Home Directory)" \
+    "󰈬  Search Code Inside Files (Ripgrep)" \
+    "󰌍  Exit" | \
+    fzf --prompt="Search Mode > " --layout=reverse --border --height=30%)
+
+case "$choice" in
+    *"Find File"*)
+        find_files
+        ;;
+    *"Search Code"*)
+        grep_code
+        ;;
+    *)
+        exit 0
+        ;;
+esac

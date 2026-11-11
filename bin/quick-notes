@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# ~/.local/bin/quick-notes: Instant floating scratchpad note for Sway
+NOTE_DIR="${HOME}/Documents"
+mkdir -p "$NOTE_DIR"
+NOTE_FILE="${NOTE_DIR}/scratch.md"
+
+if [ ! -f "$NOTE_FILE" ]; then
+    cat << 'EOF' > "$NOTE_FILE"
+# Quick Scratchpad
+- 
+
+EOF
+fi
+
+exec nvim "$NOTE_FILE"

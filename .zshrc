@@ -123,6 +123,16 @@ alias lg='lazygit'
 alias md='glow'
 alias du='gdu'
 
+# Modern coreutils (eza & bat)
+if command -v eza >/dev/null 2>&1; then
+    alias ls='eza --icons=auto --group-directories-first'
+    alias ll='eza -la --icons=auto --git --group-directories-first'
+    alias tree='eza --tree --level=2 --icons=auto'
+fi
+if command -v bat >/dev/null 2>&1; then
+    alias cat='bat --style=plain --paging=never'
+fi
+
 # Pywal terminal sequences & fzf theme
 if [ -f ~/.cache/wal/sequences ]; then
     (cat ~/.cache/wal/sequences &)

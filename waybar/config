@@ -7,7 +7,13 @@
     "start_hidden": false,
     "modules-left": ["sway/workspaces"],
     "modules-center": ["mpris"],
-    "modules-right": ["pulseaudio", "network", "cpu", "memory", "battery", "clock"],
+    "modules-right": ["custom/weather", "pulseaudio", "network", "cpu", "memory", "battery", "clock"],
+    "custom/weather": {
+        "format": "{}",
+        "interval": 1800,
+        "exec": "$HOME/.local/bin/waybar-weather",
+        "on-click": "kitty --app-id floating-weather --hold -e curl -s wttr.in"
+    },
     "mpris": {
         "format": "{player_icon} {dynamic}",
         "format-paused": "{status_icon} <i>{dynamic}</i>",
@@ -61,7 +67,7 @@
     },
     "cpu": {
         "format": "{usage}% ",
-        "on-click": "alacritty -t 'Floating Terminal' -e htop"
+        "on-click": "kitty --app-id tui-monitor -e btop"
     },
 
     "memory": {

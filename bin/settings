@@ -364,7 +364,7 @@ main_loop() {
             "󰁹  Battery & Power       →  $bat_s" \
             "󰸉  Wallpaper & Theme     →  $wal_s" \
             "󰋊  Disk Usage (gdu)      →  $disk_s" \
-            "  System Monitor        →  htop" \
+            "  System Monitor        →  btop / htop" \
             "󰐥  Power & Session       →  Lock / Reboot / Poweroff" \
             "󰅚  Exit Settings")
 
@@ -398,7 +398,9 @@ main_loop() {
                 manage_disk
                 ;;
             *"System Monitor"*)
-                if command -v htop >/dev/null 2>&1; then
+                if command -v btop >/dev/null 2>&1; then
+                    btop
+                elif command -v htop >/dev/null 2>&1; then
                     htop
                 fi
                 ;;

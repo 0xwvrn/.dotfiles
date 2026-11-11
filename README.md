@@ -72,6 +72,18 @@ The installer will:
 | <kbd>$mod</kbd> + <kbd>Shift</kbd> + <kbd>b</kbd> | Toggle Waybar visibility |
 | <kbd>$mod</kbd> + <kbd>Shift</kbd> + <kbd>r</kbd> | Reload Sway configuration |
 
+### Quick Developer & Productivity Utilities
+| Shortcut | Action |
+| :--- | :--- |
+| **<kbd>$mod</kbd> + <kbd>`</kbd>** | **Instant Dropdown Terminal** (Sway scratchpad) |
+| **<kbd>$mod</kbd> + <kbd>n</kbd>** | **Quick Scratchpad Notes** (`~/Documents/scratch.md`) |
+| **<kbd>$mod</kbd> + <kbd>Shift</kbd> + <kbd>f</kbd>** | **Interactive Finder** (Fuzzy file search & Ripgrep code search) |
+| **<kbd>$mod</kbd> + <kbd>Shift</kbd> + <kbd>m</kbd>** | **System Monitor** (`btop`) |
+| **<kbd>$mod</kbd> + <kbd>c</kbd>** | **Searchable Clipboard History** (`cliphist`) |
+| **<kbd>Print</kbd>** | Fullscreen Screenshot $\rightarrow$ Clipboard + `~/Pictures/Screenshots` |
+| **<kbd>Shift</kbd> + <kbd>Print</kbd>** | Area Crop Screenshot $\rightarrow$ Clipboard + `~/Pictures/Screenshots` |
+| **3-Finger Swipe** | Swipe left/right on touchpad to switch workspaces |
+
 ### Media & Playback Controls
 | Shortcut | Action |
 | :--- | :--- |

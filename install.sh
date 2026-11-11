@@ -124,7 +124,7 @@ deploy_dotfiles() {
     }
 
     # Deploy .config folders
-    for cfg in sway waybar kitty rofi swaylock swaynag gtk-3.0 gtk-4.0 lazygit glow mpv tmux nvim; do
+    for cfg in sway waybar kitty rofi swaylock swaynag gtk-3.0 gtk-4.0 lazygit glow mpv tmux nvim btop; do
         if [ -d "${DOTFILES_DIR}/${cfg}" ]; then
             deploy_item "${DOTFILES_DIR}/${cfg}" "${HOME}/.config/${cfg}"
         fi
