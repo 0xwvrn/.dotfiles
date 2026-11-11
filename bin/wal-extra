@@ -1270,6 +1270,48 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
 button {{
     border-radius: 0px !important;
 }}
+
+/* Compact Layout for 768p Screens */
+:root {{
+    --custom-channel-members-width: 200px !important;
+}}
+
+/* Slimmer Server Bar (Guilds) */
+[class*="guilds_"] {{
+    width: 56px !important;
+}}
+[class*="guilds_"] [class*="listItem_"] {{
+    width: 56px !important;
+}}
+[class*="guilds_"] [class*="wrapper_"] {{
+    width: 40px !important;
+    height: 40px !important;
+}}
+
+/* Slimmer Channel Sidebar */
+[class*="sidebar_"] {{
+    width: 205px !important;
+}}
+[class*="container_"] > [class*="base_"] {{
+    left: 56px !important;
+}}
+
+/* Compact Chat Messages */
+[class*="message_"] {{
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    min-height: unset !important;
+}}
+[class*="avatar_"] {{
+    width: 32px !important;
+    height: 32px !important;
+}}
+
+/* Compact Channel Items */
+[class*="channel_"] [class*="layout_"] {{
+    padding: 3px 6px !important;
+    height: 30px !important;
+}}
 """
     for target in targets:
         os.makedirs(os.path.dirname(target), exist_ok=True)
