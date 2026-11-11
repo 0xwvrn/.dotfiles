@@ -1,0 +1,24 @@
+# Dynamic Cava configuration for Arch + Sway
+[general]
+framerate = 60
+bars = 0
+bar_width = 2
+bar_spacing = 1
+
+[input]
+method = pipewire
+source = auto
+
+[output]
+method = ncurses
+style = stereo
+
+[color]
+gradient = 1
+gradient_count = 6
+gradient_color_1 = '#ACAFB4'
+gradient_color_2 = '#BABDC2'
+gradient_color_3 = '#BEC1C6'
+gradient_color_4 = '#CDD0D5'
+gradient_color_5 = '#D9DDE3'
+gradient_color_6 = '#DEE2E8'

@@ -71,6 +71,10 @@ bindgesture swipe:3:left workspace next
     # Start your launcher
     bindsym $mod+Space exec $menu
     
+    # Keybindings Cheat-Sheet HUD
+    bindsym $mod+slash exec ~/.local/bin/keybinds-menu
+    bindsym $mod+question exec ~/.local/bin/keybinds-menu
+    
     # Drag floating windows by holding down $mod and left mouse button.
     # Resize them with right mouse button + $mod.
     # Despite the name, also works for non-floating windows.

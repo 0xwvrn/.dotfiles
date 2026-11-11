@@ -1129,6 +1129,49 @@ ignore-dirs:
     print(f"Updated gdu config: {cfg_file}")
 
 
+def update_cava(c):
+    """Updates ~/.config/cava/config gradient with current Pywal colors."""
+    cava_dir = os.path.expanduser("~/.config/cava")
+    os.makedirs(cava_dir, exist_ok=True)
+    cfg_file = os.path.join(cava_dir, "config")
+
+    c1 = c.get("color1", "#818375")
+    c2 = c.get("color2", "#968A77")
+    c3 = c.get("color3", "#9C9785")
+    c4 = c.get("color4", "#AB9A86")
+    c5 = c.get("color5", "#B6A88F")
+    c6 = c.get("color6", "#C4B499")
+
+    content = f"""# Dynamic Cava configuration for Arch + Sway
+[general]
+framerate = 60
+bars = 0
+bar_width = 2
+bar_spacing = 1
+
+[input]
+method = pipewire
+source = auto
+
+[output]
+method = ncurses
+style = stereo
+
+[color]
+gradient = 1
+gradient_count = 6
+gradient_color_1 = '{c1}'
+gradient_color_2 = '{c2}'
+gradient_color_3 = '{c3}'
+gradient_color_4 = '{c4}'
+gradient_color_5 = '{c5}'
+gradient_color_6 = '{c6}'
+"""
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Updated cava config: {cfg_file}")
+
+
 def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
     """Updates Discord and Vesktop (Vencord QuickCSS & Theme) with Pywal colors and sharp styling."""
     targets = [
@@ -1384,6 +1427,7 @@ def main():
     update_mpv(bg_hex, fg, accent, c)
     update_lazygit(bg_hex, fg, accent, c)
     update_gdu(bg_hex, fg, accent, c, on_accent, selection_bg, selection_fg)
+    update_cava(c)
     update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg)
     update_shells()
 
