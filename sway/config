@@ -148,7 +148,6 @@ bindgesture swipe:3:left workspace next
     for_window [app_id="dropdown-term"] floating enable, resize set 900 520, move position center, move scratchpad
     for_window [app_id="floating-notes"] floating enable, resize set 850 560, move position center
     for_window [app_id="floating-finder"] floating enable, resize set 1000 620, move position center
-    for_window [app_id="floating-weather"] floating enable, resize set 850 580, move position center
     for_window [app_id="tui-monitor"] floating enable, resize set 1000 620, move position center
     # Automatically route Apple Music in Zen to workspace 3
     for_window [app_id="zen" title=".*Apple.*Music.*"] move container to workspace number 3
@@ -250,8 +249,8 @@ bindsym $mod+r mode "resize"
     # Interactive fuzzy file & code finder
     bindsym $mod+Shift+f exec kitty --app-id floating-finder -e ~/.local/bin/finder
 
-    # System Monitor (btop / htop)
-    bindsym $mod+Shift+m exec kitty --app-id tui-monitor -e btop
+    # System Monitor (htop)
+    bindsym $mod+Shift+m exec kitty --app-id tui-monitor -e htop
 
     # Wallpaper & dynamic color switcher
     bindsym $mod+Shift+w exec ~/.local/bin/change-wallpaper --select

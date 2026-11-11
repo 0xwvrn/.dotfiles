@@ -52,13 +52,9 @@ window#waybar {
     color: @foreground;
 }
 
-#clock, #battery, #cpu, #memory, #network, #pulseaudio, #custom-weather, #tray, #mode, #idle_inhibitor {
+#clock, #battery, #cpu, #memory, #network, #pulseaudio, #tray, #mode, #idle_inhibitor {
     padding: 0 8px;
     margin: 0 4px;
-}
-
-#custom-weather {
-    color: @color3;
 }
 
 #idle_inhibitor {
