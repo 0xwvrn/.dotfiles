@@ -1173,7 +1173,7 @@ gradient_color_6 = '{c6}'
 
 
 def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
-    """Updates Discord and Vesktop (Vencord QuickCSS & Theme) with Pywal colors and sharp styling."""
+    """Updates Discord and Vesktop (Vencord QuickCSS & Theme) with clean Pywal colors without breaking layout."""
     targets = [
         os.path.expanduser("~/.config/Vencord/settings/quickCss.css"),
         os.path.expanduser("~/.config/Vencord/themes/pywal-vencord.theme.css"),
@@ -1181,59 +1181,45 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
         os.path.expanduser("~/.config/vesktop/themes/pywal-vencord.theme.css"),
     ]
 
-    bg_darker = darken(bg_hex, 0.55)
-    bg_darkest = darken(bg_hex, 0.40)
-    accent_dark = darken(accent, 0.80)
     color8 = c.get("color8", "#99908a")
     color6 = c.get("color6", "#c4b499")
-    color1 = c.get("color1", "#818375")
 
     css = f"""/**
- * @name Pywal for Vencord
+ * @name Pywal Clean
  * @author wvrn
- * @version 2.0.0
- * @description Dynamic Pywal Theme for Discord & Vesktop
+ * @version 3.0.0
+ * @description Clean Pywal Discord Theme
  */
 
 :root, .theme-dark, .theme-light {{
+    /* Brand & Accent */
     --brand-experiment: {accent} !important;
-    --brand-experiment-360: {accent} !important;
     --brand-experiment-500: {accent} !important;
-    --brand-experiment-560: {accent_dark} !important;
-    --brand-experiment-600: {accent_dark} !important;
+    --brand-experiment-560: {accent} !important;
+    --brand-experiment-600: {accent} !important;
 
     /* Backgrounds */
     --background-primary: {bg_hex} !important;
-    --background-secondary: {bg_dark} !important;
-    --background-secondary-alt: {bg_darker} !important;
-    --background-tertiary: {bg_darkest} !important;
-    --background-floating: {bg_dark} !important;
+    --background-secondary: color-mix(in srgb, {bg_hex}, black 15%) !important;
+    --background-secondary-alt: color-mix(in srgb, {bg_hex}, black 25%) !important;
+    --background-tertiary: color-mix(in srgb, {bg_hex}, black 35%) !important;
+    --background-floating: color-mix(in srgb, {bg_hex}, black 20%) !important;
     --background-accent: {accent} !important;
-    --background-modifier-hover: {hover_bg} !important;
-    --background-modifier-active: {accent}33 !important;
-    --background-modifier-selected: {accent}44 !important;
-    --channeltextarea-background: {bg_dark} !important;
-    --input-background: {bg_dark} !important;
 
-    /* Modern Discord Base & Surface Variables */
+    /* Discord Visual Refresh variables */
     --bg-base-primary: {bg_hex} !important;
-    --bg-base-secondary: {bg_dark} !important;
-    --bg-base-tertiary: {bg_darkest} !important;
+    --bg-base-secondary: color-mix(in srgb, {bg_hex}, black 15%) !important;
+    --bg-base-tertiary: color-mix(in srgb, {bg_hex}, black 35%) !important;
     --bg-overlay-1: {bg_hex} !important;
-    --bg-overlay-2: {bg_dark} !important;
-    --bg-overlay-3: {bg_darker} !important;
+    --bg-overlay-2: color-mix(in srgb, {bg_hex}, black 15%) !important;
+    --bg-overlay-3: color-mix(in srgb, {bg_hex}, black 25%) !important;
     --bg-overlay-app-frame: {bg_hex} !important;
-    --background-base-lowest: {bg_darkest} !important;
-    --background-base-lower: {bg_darker} !important;
-    --background-base-low: {bg_dark} !important;
-    --background-surface-high: {bg_dark} !important;
-    --background-surface-higher: {bg_darker} !important;
-    --background-surface-highest: {bg_darkest} !important;
     --chat-background-default: {bg_hex} !important;
-    --__header-bar-background: {bg_hex} !important;
-    --custom-channel-members-bg: {bg_dark} !important;
+    --channeltextarea-background: color-mix(in srgb, {bg_hex}, black 20%) !important;
+    --input-background: color-mix(in srgb, {bg_hex}, black 20%) !important;
+    --card-primary-bg: color-mix(in srgb, {bg_hex}, black 15%) !important;
 
-    /* Text */
+    /* Text & Icons */
     --text-normal: {fg} !important;
     --text-muted: {color8} !important;
     --header-primary: {fg} !important;
@@ -1247,113 +1233,17 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
     --scrollbar-auto-thumb: {accent} !important;
     --scrollbar-auto-track: transparent !important;
     --scrollbar-thin-thumb: {accent} !important;
-
-    /* Sharp aesthetic */
-    --radius-xs: 0px !important;
-    --radius-sm: 0px !important;
-    --radius-md: 0px !important;
-    --radius-lg: 0px !important;
-    --radius-xl: 0px !important;
-    --radius-full: 0px !important;
-    --radius-round: 0px !important;
-
-    /* Monospace font */
-    --font-primary: "Hack", monospace !important;
-    --font-display: "Hack", monospace !important;
-    --font-code: "Hack", monospace !important;
-}}
-
-/* Global resets for consistent look */
-* {{
-    border-radius: 0px !important;
-    font-family: "Hack", monospace !important;
-}}
-
-/* Unread & Notification Badges */
-[class*="unread_"] {{
-    background-color: {accent} !important;
-    border-radius: 0px !important;
-}}
-
-[class*="numberBadge_"], [class*="badge_"] {{
-    background-color: {accent} !important;
-    color: #121212 !important;
-    border-radius: 0px !important;
-}}
-
-[class*="item_"][style*="height"] {{
-    border-radius: 0px !important;
-    background-color: {accent} !important;
 }}
 
 /* Active channel highlight */
 [class*="modeSelected_"] [class*="link_"] {{
-    background-color: {bg_dark} !important;
-    border-left: 2px solid {accent} !important;
+    background-color: color-mix(in srgb, {accent}, transparent 85%) !important;
+    border-left: 3px solid {accent} !important;
 }}
 
-/* Mention tags */
-[class*="mentioned_"] {{
-    background-color: {accent}1a !important;
-}}
-[class*="mentioned_"]::before {{
+/* Notification & unread pills */
+[class*="item_"][style*="height"] {{
     background-color: {accent} !important;
-    border-radius: 0px !important;
-}}
-
-/* Avatars & Server Icons: 0px sharp blocks */
-[class*="avatar_"], [class*="wrapper_"] foreignObject, [class*="mask_"] foreignObject,
-[class*="guildIcon_"], [class*="icon_"], [class*="childWrapper_"] {{
-    border-radius: 0px !important;
-    mask: none !important;
-    -webkit-mask: none !important;
-}}
-
-/* Buttons */
-button {{
-    border-radius: 0px !important;
-}}
-
-/* Compact Layout for 768p Screens */
-:root {{
-    --custom-channel-members-width: 200px !important;
-}}
-
-/* Slimmer Server Bar (Guilds) */
-[class*="guilds_"] {{
-    width: 56px !important;
-}}
-[class*="guilds_"] [class*="listItem_"] {{
-    width: 56px !important;
-}}
-[class*="guilds_"] [class*="wrapper_"] {{
-    width: 40px !important;
-    height: 40px !important;
-}}
-
-/* Slimmer Channel Sidebar */
-[class*="sidebar_"] {{
-    width: 205px !important;
-}}
-[class*="container_"] > [class*="base_"] {{
-    left: 56px !important;
-}}
-
-/* Compact Chat Messages */
-[class*="message_"] {{
-    padding-top: 2px !important;
-    padding-bottom: 2px !important;
-    min-height: unset !important;
-}}
-[class*="avatar_"] {{
-    width: 32px !important;
-    height: 32px !important;
-}}
-
-/* Compact Channel Items */
-[class*="channel_"] [class*="layout_"] {{
-    padding: 3px 6px !important;
-    height: 30px !important;
 }}
 """
     for target in targets:
