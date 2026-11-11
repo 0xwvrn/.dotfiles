@@ -141,6 +141,17 @@ deploy_dotfiles() {
         success "Installed scripts in ~/.local/bin/"
     fi
 
+    # Deploy helper libraries to ~/.local/lib
+    if [ -d "${DOTFILES_DIR}/lib" ]; then
+        mkdir -p "${HOME}/.local/lib"
+        for libfile in "${DOTFILES_DIR}/lib"/*; do
+            local lname
+            lname="$(basename "$libfile")"
+            deploy_item "$libfile" "${HOME}/.local/lib/${lname}"
+        done
+        success "Installed helper libraries in ~/.local/lib/"
+    fi
+
     # Deploy wallpapers
     if [ -d "${DOTFILES_DIR}/wallpapers" ] && [ -n "$(ls -A "${DOTFILES_DIR}/wallpapers" 2>/dev/null)" ]; then
         cp -rn "${DOTFILES_DIR}/wallpapers"/* "${HOME}/wallpaper/" 2>/dev/null || true
