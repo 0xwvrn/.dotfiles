@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+QSS="${HOME}/.cache/wal/dolphin.qss"
+LIB="${HOME}/.local/lib/libdolphin_fix.so"
+
+if [ -f "$LIB" ]; then
+    export LD_PRELOAD="${LIB}${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+
+if [ -f "$QSS" ]; then
+    exec /usr/bin/dolphin -stylesheet "$QSS" "$@"
+else
+    exec /usr/bin/dolphin "$@"
+fi

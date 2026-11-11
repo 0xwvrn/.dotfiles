@@ -1,0 +1,37 @@
+# Pywal dynamic configuration for swaylock
+image=/tmp/swaylock-battery.png
+color=121212
+scaling=fill
+daemonize
+indicator-idle-visible
+show-failed-attempts
+ignore-empty-password
+font="Noto Sans"
+
+indicator-radius=100
+indicator-thickness=7
+
+inside-color=121212cc
+inside-clear-color=121212cc
+inside-ver-color=121212cc
+inside-wrong-color=818375cc
+
+ring-color=AB9A86
+ring-clear-color=968A77
+ring-ver-color=AB9A86
+ring-wrong-color=818375
+
+key-hl-color=B6A88F
+bs-hl-color=818375
+
+text-color=f1ede9
+text-clear-color=f1ede9
+text-ver-color=f1ede9
+text-wrong-color=f1ede9
+
+line-color=00000000
+line-clear-color=00000000
+line-ver-color=00000000
+line-wrong-color=00000000
+
+separator-color=00000000

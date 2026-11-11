@@ -1,0 +1,124 @@
+@import "../../.cache/wal/colors-waybar.css";
+
+* {
+    border: none;
+    border-radius: 0px;
+    font-family: "Hack", monospace;
+    font-size: 12px;
+    min-height: 0;
+    color: @foreground;
+}
+
+window#waybar {
+    border-bottom: 2px solid @color4;
+    background: @background;
+}
+
+#workspaces, #clock, #custom-music, #mpris, #window { 
+    font-weight: 800;
+}
+
+/* Workspace Buttons */
+#workspaces button {
+    padding: 0 6px;
+    background: transparent;
+    border-radius: 0;
+}
+
+#workspaces button label {
+    color: @color4;
+}
+
+#workspaces button.focused {
+    background: @color4; 
+}
+
+#workspaces button.focused label {
+    color: @background;
+}
+
+#workspaces button:hover {
+    box-shadow: inherit;
+    text-shadow: inherit;
+    background: @color2;
+}
+
+#workspaces button:hover label {
+    color: @background;
+}
+
+#mode {
+    background-color: @color1;
+    color: @foreground;
+}
+
+#clock, #battery, #cpu, #memory, #network, #pulseaudio, #tray, #mode, #idle_inhibitor {
+    padding: 0 8px;
+    margin: 0 4px;
+}
+
+#idle_inhibitor {
+    padding: 0 10px;
+}
+
+#idle_inhibitor.activated {
+    background-color: @color4;
+    color: @background;
+}
+
+#custom-music, #mpris {
+    color: @color2;
+    margin: 0 15px;
+    padding: 0 12px;
+    border-bottom: 2px solid @color2;
+}
+
+#mpris.paused {
+    color: @color8;
+    border-bottom: 2px solid @color8;
+}
+
+#clock {
+    margin: 0;
+    color: @color3;
+    border-bottom: 2px solid @color3;
+}
+
+#cpu {
+    color: @color5;
+}
+
+#memory {
+    color: @color6;
+}
+
+#network {
+    color: @color4;
+}
+
+#network.disconnected {
+    color: @color1;
+    border-bottom: 2px solid @color1;
+}
+
+#pulseaudio {
+    color: @color2;
+}
+
+#pulseaudio.muted {
+    padding: 0 20px;
+    color: @color1;
+    border-bottom: 2px solid @color1;
+}
+
+#battery {
+    color: @color2;
+}
+
+#battery.warning {
+    color: @color3;
+}
+
+#battery.critical {
+    color: @color1;
+}

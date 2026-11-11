@@ -1,0 +1,91 @@
+/* Pywal dynamic theme for GTK 3 & 4 */
+@define-color theme_bg_color #121212;
+@define-color theme_fg_color #f1ede9;
+@define-color theme_base_color #121212;
+@define-color theme_text_color #f1ede9;
+@define-color theme_selected_bg_color #818375;
+@define-color theme_selected_fg_color #121212;
+@define-color borders #AB9A86;
+@define-color headerbar_bg_color #0d0d0d;
+@define-color headerbar_fg_color #f1ede9;
+@define-color popover_bg_color #0d0d0d;
+@define-color popover_fg_color #f1ede9;
+@define-color view_bg_color #121212;
+@define-color view_fg_color #f1ede9;
+
+/* Sharp rectangular aesthetic (0px border-radius) */
+* {
+    border-radius: 0px;
+    font-family: "Inter", sans-serif;
+}
+
+window, dialog {
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+}
+
+/* Context Menus, Popovers, Dropdowns (Strict 0px Corners & Palette Matching) */
+window.popup,
+window.background.popup,
+.popup,
+menu,
+.menu,
+.context-menu,
+popover,
+.popover,
+popover.menu,
+popover > contents,
+popover.menu > contents,
+.popover > contents,
+.csd.popup {
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+    border: 1px solid @borders;
+    border-radius: 0px;
+    box-shadow: none;
+    padding: 3px 0px;
+}
+
+menubar, .menubar {
+    background-color: @headerbar_bg_color;
+    color: @headerbar_fg_color;
+}
+
+menuitem,
+.menuitem,
+modelbutton,
+.modelbutton {
+    background-color: transparent;
+    color: @theme_fg_color;
+    border-radius: 0px;
+    padding: 5px 12px;
+    min-height: 22px;
+}
+
+menuitem:hover,
+menuitem:selected,
+modelbutton:hover,
+modelbutton:selected {
+    background-color: @theme_selected_bg_color;
+    color: @theme_selected_fg_color;
+    border-radius: 0px;
+}
+
+menuitem label,
+modelbutton label {
+    color: inherit;
+    font-family: "Inter", sans-serif;
+}
+
+menuitem arrow,
+modelbutton arrow {
+    color: inherit;
+}
+
+separator,
+separator.horizontal,
+.menu-separator {
+    background-color: @borders;
+    min-height: 1px;
+    margin: 4px 0px;
+}

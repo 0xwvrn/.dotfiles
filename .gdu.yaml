@@ -1,0 +1,35 @@
+# Pywal dynamic theme for gdu (SSD/HDD disk usage analyzer)
+style:
+    header:
+        hidden: false
+        text-color: '#121212'
+        background-color: '#AB9A86'
+    footer:
+        text-color: '#121212'
+        background-color: '#AB9A86'
+        number-color: '#121212'
+    selected-row:
+        text-color: '#121212'
+        background-color: '#818375'
+    marked:
+        text-color: '#121212'
+        background-color: '#9C9785'
+    result-row:
+        directory-color: '#AB9A86'
+        number-color: '#B6A88F'
+    progress-modal:
+        current-item-path-max-len: 0
+        show-disk-progress-bar: true
+    use-old-size-bar: false
+    show-bar-percentage: true
+
+mouse: true
+archive-browsing: false
+collapse-path: true
+no-cross: true
+ignore-dirs:
+    - /proc
+    - /dev
+    - /sys
+    - /run
+    - /tmp

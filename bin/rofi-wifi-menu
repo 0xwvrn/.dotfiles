@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# rofi-wifi-menu: Minimal, sharp, wallpaper-adaptive Wi-Fi selector for Sway/Rofi
+
+set -e
+
+# Notify function
+notify() {
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "Wi-Fi" "$1"
+    fi
+}
+
+# Check Wi-Fi state
+wifi_state=$(nmcli -fields WIFI g | tail -n 1 | tr -d ' ')
+
+if [ "$wifi_state" = "disabled" ]; then
+    toggle_opt="󰤨  Enable Wi-Fi"
+    chosen=$(echo -e "$toggle_opt" | rofi -dmenu -i -p "󰤮 Wi-Fi Off")
+    if [ "$chosen" = "$toggle_opt" ]; then
+        nmcli radio wifi on
+        notify "Wi-Fi enabled. Scanning..."
+    fi
+    exit 0
+fi
+
+toggle_opt="󰤮  Disable Wi-Fi"
+rescan_opt="󰑐  Rescan Networks"
+
+# Rescan & get list
+wifi_list=$(nmcli --terse --fields "IN-USE,SSID,SECURITY,BARS,SIGNAL" device wifi list --rescan no 2>/dev/null | awk -F: '
+NF >= 4 && $2 != "" {
+    in_use = ($1 == "*") ? "✓ " : "  ";
+    sec = ($3 != "" && $3 != "--") ? "󰌾 " : "  ";
+    printf "%s%-26s %s %s (%s%%)\n", in_use, $2, sec, $4, $5
+}' | sort -u)
+
+menu_content=$(echo -e "${toggle_opt}\n${rescan_opt}\n${wifi_list}")
+
+chosen=$(echo -e "$menu_content" | rofi -dmenu -i -p "󰤨 Networks")
+
+if [ -z "$chosen" ]; then
+    exit 0
+fi
+
+if [ "$chosen" = "$toggle_opt" ]; then
+    nmcli radio wifi off
+    notify "Wi-Fi disabled"
+    exit 0
+fi
+
+if [ "$chosen" = "$rescan_opt" ]; then
+    notify "Rescanning Wi-Fi networks..."
+    nmcli device wifi rescan
+    exec "$0"
+fi
+
+# Extract SSID (strip checkmark, icon, and trailing signal info)
+ssid=$(echo "$chosen" | sed 's/^[ ✓]*//' | awk '{print $1}')
+
+if [ -z "$ssid" ]; then
+    exit 0
+fi
+
+# Check if connection already exists in NetworkManager
+if nmcli connection show | grep -Fq "$ssid"; then
+    notify "Connecting to saved network: $ssid..."
+    if nmcli connection up id "$ssid"; then
+        notify "Connected to $ssid"
+    else
+        notify "Failed to connect to $ssid"
+    fi
+else
+    # Check if network requires password
+    sec=$(nmcli -t -f SSID,SECURITY dev wifi list | grep "^${ssid}:" | cut -d: -f2 | head -n 1 || true)
+    
+    if [ -n "$sec" ] && [ "$sec" != "--" ]; then
+        pass=$(rofi -dmenu -password -p "Enter password for $ssid")
+        [ -z "$pass" ] && exit 0
+        notify "Connecting to $ssid..."
+        if nmcli device wifi connect "$ssid" password "$pass"; then
+            notify "Connected to $ssid"
+        else
+            notify "Failed to connect to $ssid (incorrect password or timeout)"
+        fi
+    else
+        notify "Connecting to open network: $ssid..."
+        if nmcli device wifi connect "$ssid"; then
+            notify "Connected to $ssid"
+        else
+            notify "Failed to connect to $ssid"
+        fi
+    fi
+fi

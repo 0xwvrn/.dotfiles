@@ -1,0 +1,415 @@
+#!/usr/bin/env bash
+# settings: Minimal, instantaneous TUI Control Center for Sway
+# Powered by fzf, pywal, NetworkManager, PipeWire, and brightnessctl
+
+set -e
+
+# Load pywal dynamic colors for fzf if available
+if [ -f "$HOME/.cache/wal/colors-fzf.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.cache/wal/colors-fzf.sh"
+fi
+
+if ! command -v fzf >/dev/null 2>&1; then
+    echo "Error: fzf is required for settings." >&2
+    exit 1
+fi
+
+get_wifi_status() {
+    local ssid
+    ssid=$(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | grep ':802-11-wireless$' | cut -d: -f1 | head -n 1 || true)
+    if [ -n "$ssid" ]; then
+        echo "Connected ($ssid)"
+    else
+        local state
+        state=$(nmcli radio wifi 2>/dev/null || echo "enabled")
+        if [ "$state" = "disabled" ]; then
+            echo "Disabled"
+        else
+            echo "Disconnected"
+        fi
+    fi
+}
+
+get_bt_status() {
+    local dev
+    dev=$(bluetoothctl devices Connected 2>/dev/null | head -n 1 | cut -d' ' -f3- || true)
+    if [ -n "$dev" ]; then
+        echo "On ($dev)"
+    else
+        if bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then
+            echo "On"
+        else
+            echo "Off"
+        fi
+    fi
+}
+
+get_volume_status() {
+    local v
+    v=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || true)
+    if [ -n "$v" ]; then
+        local raw
+        raw=$(echo "$v" | cut -d' ' -f2)
+        local pct
+        pct=$(awk '{printf "%d", $1 * 100}' <<< "$raw")
+        if [[ "$v" == *"[MUTED]"* ]]; then
+            echo "${pct}% [Muted]"
+        else
+            echo "${pct}%"
+        fi
+    else
+        echo "Unknown"
+    fi
+}
+
+get_brightness_status() {
+    local b
+    b=$(brightnessctl -m 2>/dev/null | cut -d, -f4 || true)
+    [ -n "$b" ] && echo "$b" || echo "Unknown"
+}
+
+get_battery_status() {
+    if [ -f "/sys/class/power_supply/BAT0/capacity" ]; then
+        local cap
+        cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo "")
+        local stat
+        stat=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo "")
+        echo "${cap}% [${stat}]"
+    else
+        echo "AC"
+    fi
+}
+
+get_wallpaper_status() {
+    local wal_file="$HOME/.cache/wal/wal"
+    if [ -f "$wal_file" ]; then
+        basename "$(cat "$wal_file")"
+    else
+        echo "Default"
+    fi
+}
+
+get_disk_status() {
+    df -h "$HOME" 2>/dev/null | awk 'NR==2 {print $4 " free (" $5 " used)"}' || echo "Available"
+}
+
+fzf_menu() {
+    local prompt="$1"
+    local header="$2"
+    shift 2
+    fzf --ansi \
+        --header="$header" \
+        --prompt="$prompt > " \
+        --layout=reverse \
+        --border \
+        --no-scrollbar \
+        --pointer="▶" \
+        "$@"
+}
+
+manage_wifi() {
+    # Directly invoke wifi TUI
+    if [ -x "$HOME/.local/bin/wifi" ]; then
+        "$HOME/.local/bin/wifi" || true
+    fi
+}
+
+manage_bluetooth() {
+    if [ -x "$HOME/.local/bin/bt" ]; then
+        "$HOME/.local/bin/bt" || true
+    fi
+}
+
+manage_volume() {
+    while true; do
+        local cur_vol
+        cur_vol=$(get_volume_status)
+        local choice
+        choice=$(printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s" \
+            "󰕾  Increase Volume (+5%)" \
+            "󰖀  Decrease Volume (-5%)" \
+            "󰕾  Increase Volume (+10%)" \
+            "󰖀  Decrease Volume (-10%)" \
+            "󰝟  Toggle Mute (Speakers/Output)" \
+            "󰍬  Toggle Microphone Mute" \
+            "󰓃  Set Volume: 25%" \
+            "󰓃  Set Volume: 50%" \
+            "󰓃  Set Volume: 75%" \
+            "󰓃  Set Volume: 100%" \
+            "󰋋  Switch Audio Output Sink" \
+            "󰌍  Back to Settings" | \
+            fzf_menu "Volume" "Volume Control (Current: $cur_vol)")
+
+        case "$choice" in
+            *"+5%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ || pactl set-sink-volume @DEFAULT_SINK@ +5%
+                ;;
+            *"-5%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- || pactl set-sink-volume @DEFAULT_SINK@ -5%
+                ;;
+            *"+10%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%+ || pactl set-sink-volume @DEFAULT_SINK@ +10%
+                ;;
+            *"-10%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%- || pactl set-sink-volume @DEFAULT_SINK@ -10%
+                ;;
+            *"Toggle Mute (Speakers"*)
+                wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle || pactl set-sink-mute @DEFAULT_SINK@ toggle
+                ;;
+            *"Toggle Microphone"*)
+                wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle || pactl set-source-mute @DEFAULT_SOURCE@ toggle
+                ;;
+            *"Set Volume: 25%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.25 || pactl set-sink-volume @DEFAULT_SINK@ 25%
+                ;;
+            *"Set Volume: 50%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.50 || pactl set-sink-volume @DEFAULT_SINK@ 50%
+                ;;
+            *"Set Volume: 75%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.75 || pactl set-sink-volume @DEFAULT_SINK@ 75%
+                ;;
+            *"Set Volume: 100%"*)
+                wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.00 || pactl set-sink-volume @DEFAULT_SINK@ 100%
+                ;;
+            *"Switch Audio Output Sink"*)
+                local sinks
+                sinks=$(wpctl status 2>/dev/null | sed -n '/Sinks:/,/Sources:/p' | grep -E '^[ │]*[0-9]+\.' | sed 's/^[ │]*//' || true)
+                if [ -n "$sinks" ]; then
+                    local sel_sink
+                    sel_sink=$(echo "$sinks" | fzf_menu "Sink" "Select Audio Output Device")
+                    if [ -n "$sel_sink" ]; then
+                        local sink_id
+                        sink_id=$(echo "$sel_sink" | grep -oE '^[0-9]+')
+                        if [ -n "$sink_id" ]; then
+                            wpctl set-default "$sink_id"
+                        fi
+                    fi
+                fi
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+}
+
+manage_brightness() {
+    while true; do
+        local cur_b
+        cur_b=$(get_brightness_status)
+        local choice
+        choice=$(printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s" \
+            "󰃠  Increase Brightness (+10%)" \
+            "󰃞  Decrease Brightness (-10%)" \
+            "󰃠  Increase Brightness (+5%)" \
+            "󰃞  Decrease Brightness (-5%)" \
+            "󰃚  Set Brightness: 25%" \
+            "󰃚  Set Brightness: 50%" \
+            "󰃚  Set Brightness: 75%" \
+            "󰃚  Set Brightness: 100%" \
+            "󰌍  Back to Settings" | \
+            fzf_menu "Brightness" "Screen Brightness (Current: $cur_b)")
+
+        case "$choice" in
+            *"+10%"*)
+                brightnessctl set 10%+
+                ;;
+            *"-10%"*)
+                brightnessctl set 10%-
+                ;;
+            *"+5%"*)
+                brightnessctl set 5%+
+                ;;
+            *"-5%"*)
+                brightnessctl set 5%-
+                ;;
+            *"25%"*)
+                brightnessctl set 25%
+                ;;
+            *"50%"*)
+                brightnessctl set 50%
+                ;;
+            *"75%"*)
+                brightnessctl set 75%
+                ;;
+            *"100%"*)
+                brightnessctl set 100%
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+}
+
+manage_wallpaper() {
+    while true; do
+        local cur_w
+        cur_w=$(get_wallpaper_status)
+        local choice
+        choice=$(printf "%s\n%s\n%s\n%s" \
+            "󰸉  Select Wallpaper (Interactive Picker)" \
+            "  Random Wallpaper from ~/wallpaper" \
+            "󰁯  Restore Last Wallpaper" \
+            "󰌍  Back to Settings" | \
+            fzf_menu "Wallpaper" "Active Wallpaper: $cur_w")
+
+        case "$choice" in
+            *"Select Wallpaper"*)
+                if [ -x "$HOME/.local/bin/change-wallpaper" ]; then
+                    "$HOME/.local/bin/change-wallpaper" --select || true
+                fi
+                break
+                ;;
+            *"Random Wallpaper"*)
+                if [ -x "$HOME/.local/bin/change-wallpaper" ]; then
+                    "$HOME/.local/bin/change-wallpaper" --random || true
+                fi
+                break
+                ;;
+            *"Restore Last"*)
+                if [ -x "$HOME/.local/bin/change-wallpaper" ]; then
+                    "$HOME/.local/bin/change-wallpaper" --restore || true
+                fi
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+}
+
+manage_disk() {
+    while true; do
+        local cur_d
+        cur_d=$(get_disk_status)
+        local choice
+        choice=$(printf "%s\n%s\n%s\n%s" \
+            "󰋊  Analyze Home Directory (~)" \
+            "  Analyze Root Filesystem (/)" \
+            "󰋊  Show Mounted Disks & Partitions (-d)" \
+            "󰌍  Back to Settings" | \
+            fzf_menu "Disk" "Disk Usage Analyzer (gdu) — $cur_d")
+
+        case "$choice" in
+            *"Home Directory"*)
+                gdu -x "$HOME"
+                ;;
+            *"Root Filesystem"*)
+                gdu -x /
+                ;;
+            *"Mounted Disks"*)
+                gdu -d
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+}
+
+manage_power() {
+    local choice
+    choice=$(printf "%s\n%s\n%s\n%s\n%s" \
+        "󰌾  Lock Screen (swaylock)" \
+        "󰒲  Suspend / Sleep" \
+        "󰜉  Reboot System" \
+        "󰐥  Power Off" \
+        "󰌍  Back to Settings" | \
+        fzf_menu "Power" "Power & Session Control")
+
+    case "$choice" in
+        *"Lock Screen"*)
+            swaylock
+            ;;
+        *"Suspend"*)
+            systemctl suspend
+            ;;
+        *"Reboot"*)
+            systemctl reboot
+            ;;
+        *"Power Off"*)
+            systemctl poweroff
+            ;;
+        *)
+            ;;
+    esac
+}
+
+main_loop() {
+    while true; do
+        local wifi_s
+        wifi_s=$(get_wifi_status)
+        local bt_s
+        bt_s=$(get_bt_status)
+        local vol_s
+        vol_s=$(get_volume_status)
+        local bright_s
+        bright_s=$(get_brightness_status)
+        local bat_s
+        bat_s=$(get_battery_status)
+        local wal_s
+        wal_s=$(get_wallpaper_status)
+        local disk_s
+        disk_s=$(get_disk_status)
+
+        local menu_items
+        menu_items=$(printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s" \
+            "󰖩  Wi-Fi Networks        →  $wifi_s" \
+            "󰂯  Bluetooth Devices     →  $bt_s" \
+            "  Volume & Audio        →  $vol_s" \
+            "󰃠  Screen Brightness     →  $bright_s" \
+            "󰁹  Battery & Power       →  $bat_s" \
+            "󰸉  Wallpaper & Theme     →  $wal_s" \
+            "󰋊  Disk Usage (gdu)      →  $disk_s" \
+            "  System Monitor        →  htop" \
+            "󰐥  Power & Session       →  Lock / Reboot / Poweroff" \
+            "󰅚  Exit Settings")
+
+        local header="┌── System Settings ─────────────────────────────────────┐
+│ Host: $(uname -n) | Sway Wayland | $(date '+%A, %d %b %H:%M')
+└────────────────────────────────────────────────────────┘"
+
+        local selected
+        selected=$(echo "$menu_items" | fzf_menu "Settings" "$header" --height=50%)
+
+        case "$selected" in
+            *"Wi-Fi Networks"*)
+                manage_wifi
+                ;;
+            *"Bluetooth Devices"*)
+                manage_bluetooth
+                ;;
+            *"Volume & Audio"*)
+                manage_volume
+                ;;
+            *"Screen Brightness"*)
+                manage_brightness
+                ;;
+            *"Battery & Power"*)
+                manage_power
+                ;;
+            *"Wallpaper & Theme"*)
+                manage_wallpaper
+                ;;
+            *"Disk Usage"*)
+                manage_disk
+                ;;
+            *"System Monitor"*)
+                if command -v htop >/dev/null 2>&1; then
+                    htop
+                fi
+                ;;
+            *"Power & Session"*)
+                manage_power
+                ;;
+            *)
+                exit 0
+                ;;
+        esac
+    done
+}
+
+main_loop

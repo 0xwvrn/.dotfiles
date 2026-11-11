@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Pretty nmtui wrapper
+# Blocky modern UI: sharp 0px borders, square brackets [ OK ], no drop shadow,
+# dark background, light text, perfect color contrast.
+
+PRETTY_LIB="${HOME}/.local/lib/libnmtui_pretty.so"
+if [ -f "$PRETTY_LIB" ]; then
+    export LD_PRELOAD="${PRETTY_LIB}${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+
+export NMTUI_CORNERS="sharp"
+export NMTUI_BUTTON="bracket"
+export NMTUI_SHADOW="0"
+
+export NEWT_COLORS="root=white,black:border=lightgray,black:window=white,black:shadow=black,black:title=brightcyan,black:button=white,black:actbutton=black,brightcyan:compactbutton=white,black:checkbox=white,black:actcheckbox=black,brightcyan:entry=brightwhite,gray:label=white,black:listbox=white,black:actlistbox=white,black:sellistbox=white,gray:actsellistbox=black,brightcyan:textbox=white,black:acttextbox=black,brightcyan:helpline=lightgray,black:roottext=lightgray,black:emptyscale=gray,black:fullscale=brightcyan,black:disentry=gray,black"
+
+cmd="$(basename "$0")"
+if [ "$cmd" = "nmtui-connect" ] || [ "$cmd" = "nmtui-edit" ] || [ "$cmd" = "nmtui-hostname" ]; then
+    exec "/usr/bin/$cmd" "$@"
+else
+    exec /usr/bin/nmtui "$@"
+fi

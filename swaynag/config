@@ -1,0 +1,34 @@
+# Dynamic Pywal theme for swaynag
+font=JetBrainsMono Nerd Font 10
+edge=bottom
+layer=overlay
+message-padding=8
+button-padding=6
+button-gap=8
+button-dismiss-gap=12
+button-margin-right=15
+button-border-size=1
+border-bottom-size=2
+
+background=212121
+border=434241
+border-bottom=C4B499
+button-background=2c2c2b
+button-text=f1ede9
+text=f1ede9
+
+[warning]
+background=212121
+border=434241
+border-bottom=C4B499
+button-background=2c2c2b
+button-text=f1ede9
+text=f1ede9
+
+[error]
+background=212121
+border=e06c75
+border-bottom=e06c75
+button-background=2c2c2b
+button-text=f1ede9
+text=f1ede9

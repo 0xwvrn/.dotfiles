@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""
+wal-zen: Generates comprehensive dynamic CSS for Zen Browser based on current Pywal wallpaper colors.
+Updates:
+1. ~/.cache/wal/zen.css
+2. Active Zen profile chrome/userChrome.css
+3. Active Zen profile chrome/zen-themes/ecda11ae-d3fd-4052-8881-303b2504e3ce/chrome.css
+"""
+
+import json
+import os
+import glob
+
+COLORS_JSON = os.path.expanduser("~/.cache/wal/colors.json")
+ZEN_CSS = os.path.expanduser("~/.cache/wal/zen.css")
+ZEN_PROFILES_DIR = os.path.expanduser("~/.zen")
+
+def hex_to_rgb(h):
+    h = h.lstrip('#')
+    return f"{int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}"
+
+def get_lum(h):
+    h = h.lstrip('#')
+    r, g, b = [int(h[i:i+2], 16) for i in (0, 2, 4)]
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+def darken(hex_color, factor=0.85):
+    hex_color = hex_color.lstrip('#')
+    r, g, b = [int(hex_color[i:i+2], 16) for i in (0, 2, 4)]
+    r, g, b = max(0, min(255, int(r * factor))), max(0, min(255, int(g * factor))), max(0, min(255, int(g * factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def lighten(hex_color, factor=1.25):
+    hex_color = hex_color.lstrip('#')
+    r, g, b = [int(hex_color[i:i+2], 16) for i in (0, 2, 4)]
+    r, g, b = min(255, int(r * factor)), min(255, int(g * factor)), min(255, int(b * factor))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def ensure_light_hex(hex_str, min_lum=235):
+    h = hex_str.lstrip('#')
+    r, g, b = [int(h[i:i+2], 16) for i in (0, 2, 4)]
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+    if lum < min_lum:
+        ratio = (min_lum - lum) / max(1.0, (255.0 - lum))
+        r = int(r + (255 - r) * ratio)
+        g = int(g + (255 - g) * ratio)
+        b = int(b + (255 - b) * ratio)
+    return f"#{min(255, r):02x}{min(255, g):02x}{min(255, b):02x}"
+
+def main():
+    if not os.path.exists(COLORS_JSON):
+        print("Colors file not found. Run wal first.")
+        return
+
+    with open(COLORS_JSON, "r", encoding="utf-8") as f:
+        wal = json.load(f)
+
+    c = wal["colors"]
+    bg_hex = wal["special"]["background"]
+    fg_hex = wal["special"]["foreground"]
+
+    is_dark = get_lum(bg_hex) < 128
+
+    if is_dark:
+        fg = ensure_light_hex(fg_hex, min_lum=238)
+        surface = lighten(bg_hex, 1.18)
+        overlay = lighten(bg_hex, 1.35)
+        muted = c["color8"]
+        subtle = c["color3"]
+        accent = c["color4"]
+        secondary = c["color5"]
+    else:
+        fg = fg_hex
+        surface = darken(bg_hex, 0.90)
+        overlay = darken(bg_hex, 0.80)
+        muted = c["color8"]
+        subtle = c["color3"]
+        accent = c["color4"]
+        secondary = c["color5"]
+
+    css_content = f"""/* Pywal dynamic theme for Zen Browser */
+* {{
+    --base: {bg_hex};
+    --surface: {surface};
+    --overlay: {overlay};
+    --muted: {muted};
+    --subtle: {subtle};
+    --text: {fg};
+    --bright: {c["color7"]};
+    --secondary: {secondary};
+    --primary: {accent};
+    --on-primary: {bg_hex};
+}}
+
+:root {{
+    /* Core Zen accent & colors */
+    --zen-primary-color: var(--primary) !important;
+    --zen-colors-primary: var(--base) !important;
+    --zen-colors-secondary: var(--surface) !important;
+    --zen-colors-tertiary: var(--base) !important;
+    --zen-colors-hover-bg: var(--overlay) !important;
+    --zen-colors-primary-foreground: var(--text) !important;
+    --zen-colors-border: var(--primary) !important;
+    --zen-colors-border-contrast: var(--subtle) !important;
+    --zen-colors-input-bg: var(--surface) !important;
+
+    /* Backgrounds */
+    --zen-main-browser-background: var(--base) !important;
+    --zen-dialog-background: var(--overlay) !important;
+    --zen-themed-toolbar-bg: var(--base) !important;
+    --zen-themed-toolbar-bg-transparent: transparent !important;
+    --zen-urlbar-background: var(--surface) !important;
+    --zen-branding-dark: var(--base) !important;
+    --zen-branding-paper: var(--bright) !important;
+    --zen-input-border-color: var(--overlay) !important;
+
+    /* Sidebar & chrome */
+    --zen-sidebar-notification-bg: var(--primary) !important;
+    --zen-sidebar-themed-icon-fill: var(--text) !important;
+    --zen-appcontent-border: 1px solid var(--overlay) !important;
+
+    /* Toolbar / Firefox standard */
+    --toolbar-bgcolor: var(--base) !important;
+    --toolbar-color: var(--text) !important;
+    --toolbox-bgcolor-inactive: var(--base) !important;
+    --toolbox-textcolor: var(--text) !important;
+    --toolbox-textcolor-inactive: var(--text) !important;
+    --toolbarbutton-icon-fill: var(--primary) !important;
+    --toolbarbutton-hover-background: var(--overlay) !important;
+    --toolbarbutton-active-background: var(--muted) !important;
+
+    /* URL bar */
+    --urlbar-box-bgcolor: var(--surface) !important;
+    --urlbar-box-hover-bgcolor: var(--overlay) !important;
+    --urlbar-box-focus-bgcolor: var(--surface) !important;
+    --urlbar-box-text-color: var(--text) !important;
+    --toolbar-field-color: var(--text) !important;
+    --toolbar-field-focus-color: var(--text) !important;
+
+    /* Tabs */
+    --tab-selected-bgcolor: var(--overlay) !important;
+    --tab-selected-color: var(--text) !important;
+    --tab-selected-textcolor: var(--primary) !important;
+
+    /* Popups & menus */
+    --arrowpanel-background: var(--overlay) !important;
+    --arrowpanel-color: var(--text) !important;
+    --arrowpanel-border-color: var(--overlay) !important;
+
+    /* Sidebar / LWT */
+    --sidebar-text-color: var(--text) !important;
+    --lwt-sidebar-text-color: var(--text) !important;
+    --lwt-sidebar-background-color: var(--base) !important;
+    --lwt-text-color: var(--text) !important;
+
+    /* New tab page */
+    --newtab-background-color: var(--overlay) !important;
+    --newtab-text-primary-color: var(--text) !important;
+}}
+
+/* Sidebar & layout containers */
+#navigator-toolbox,
+#zen-tabbox-wrapper,
+.sidebar-panel {{
+    background-color: var(--base) !important;
+}}
+
+#zen-sidebar-splitter {{
+    background-color: var(--base) !important;
+    opacity: 1 !important;
+}}
+
+.sidebar-placesTree {{
+    background-color: var(--surface) !important;
+}}
+
+#zen-workspaces-button {{
+    background-color: var(--surface) !important;
+}}
+
+#zen-appcontent-navbar-container {{
+    background-color: var(--base) !important;
+}}
+
+#TabsToolbar {{
+    background-color: var(--base) !important;
+}}
+
+hbox#titlebar {{
+    background-color: var(--base) !important;
+}}
+
+/* Navigation controls */
+#back-button .toolbarbutton-icon,
+#forward-button .toolbarbutton-icon,
+#reload-button .toolbarbutton-icon,
+#stop-button .toolbarbutton-icon,
+#PanelUI-menu-button .toolbarbutton-icon,
+#unified-extensions-button .toolbarbutton-icon,
+#nav-bar-overflow-button .toolbarbutton-icon,
+#zen-toggle-compact-mode .toolbarbutton-icon {{
+    fill: var(--primary) !important;
+    color: var(--primary) !important;
+}}
+
+toolbarbutton#tabs-newtab-button {{
+    color: var(--text) !important;
+}}
+
+.tab-text {{
+    color: var(--text) !important;
+}}
+
+.tab-background[selected=""] {{
+    background: var(--overlay) !important;
+}}
+
+#urlbar-input {{
+    color: var(--text) !important;
+}}
+
+#urlbar-input::selection {{
+    background-color: var(--primary) !important;
+    color: var(--on-primary) !important;
+}}
+
+.urlbar-background,
+#urlbar-input-container {{
+    background-color: var(--base) !important;
+}}
+
+.urlbarView-url {{
+    color: var(--primary) !important;
+}}
+
+#urlbar-results {{
+    background-color: var(--overlay) !important;
+    color: var(--text) !important;
+}}
+
+.zen-current-workspace-indicator-name {{
+    color: var(--text) !important;
+}}
+
+.zen-current-workspace-indicator-icon {{
+    fill: var(--text) !important;
+}}
+"""
+
+    # 1. Write to ~/.cache/wal/zen.css
+    os.makedirs(os.path.dirname(ZEN_CSS), exist_ok=True)
+    with open(ZEN_CSS, "w", encoding="utf-8") as out:
+        out.write(css_content)
+    print(f"Generated Zen Browser theme: {ZEN_CSS}")
+
+    # 2. Write to active profile(s)
+    if os.path.isdir(ZEN_PROFILES_DIR):
+        for profile in glob.glob(os.path.join(ZEN_PROFILES_DIR, "*.Default*")):
+            chrome_dir = os.path.join(profile, "chrome")
+            os.makedirs(chrome_dir, exist_ok=True)
+            
+            # user.js
+            user_js = os.path.join(profile, "user.js")
+            pref_line = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);\n'
+            has_pref = False
+            if os.path.exists(user_js):
+                with open(user_js, "r", encoding="utf-8") as uj:
+                    if "toolkit.legacyUserProfileCustomizations.stylesheets" in uj.read():
+                        has_pref = True
+            if not has_pref:
+                with open(user_js, "a", encoding="utf-8") as uj:
+                    uj.write(pref_line)
+                print(f"Enabled custom stylesheets pref in {user_js}")
+
+            # userChrome.css
+            user_chrome = os.path.join(chrome_dir, "userChrome.css")
+            with open(user_chrome, "w", encoding="utf-8") as uc:
+                uc.write(css_content)
+            print(f"Updated {user_chrome}")
+
+            # Also update active color theme mod if present (e.g. Gruvbox mod)
+            gruvbox_css = os.path.join(chrome_dir, "zen-themes", "ecda11ae-d3fd-4052-8881-303b2504e3ce", "chrome.css")
+            if os.path.exists(gruvbox_css):
+                with open(gruvbox_css, "w", encoding="utf-8") as gc:
+                    gc.write(css_content)
+                print(f"Updated Zen color mod: {gruvbox_css}")
+
+if __name__ == "__main__":
+    main()

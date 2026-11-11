@@ -1,0 +1,39 @@
+# Lazygit configuration - Minimal, blocky & delta-integrated
+gui:
+  border: single
+  nerdFontsVersion: "3"
+  showIcons: true
+  showFileIcons: true
+  sidePanelWidth: 0.3333
+  theme:
+    activeBorderColor:
+      - "#AB9A86"
+      - bold
+    inactiveBorderColor:
+      - "#818375"
+    searchingActiveBorderColor:
+      - "#C4B499"
+      - bold
+    optionsTextColor:
+      - "#9C9785"
+    selectedLineBgColor:
+      - "#818375"
+    inactiveViewSelectedLineBgColor:
+      - bold
+    cherryPickedCommitFgColor:
+      - "#AB9A86"
+    cherryPickedCommitBgColor:
+      - "#121212"
+    markedBaseCommitFgColor:
+      - "#AB9A86"
+    markedBaseCommitBgColor:
+      - "#818375"
+    unstagedChangesColor:
+      - red
+    defaultFgColor:
+      - "#f1ede9"
+
+git:
+  paging:
+    colorArg: always
+    pager: delta --dark --paging=never

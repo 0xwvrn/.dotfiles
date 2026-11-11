@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Toggle script for Sway exit & power menu
+
+if pgrep -x swaynag >/dev/null 2>&1; then
+    killall swaynag
+else
+    if [ -f "$HOME/.local/lib/swaynag-top-border.so" ]; then
+        export LD_PRELOAD="$HOME/.local/lib/swaynag-top-border.so"
+    fi
+    exec swaynag \
+        -e bottom \
+        -t warning \
+        -m '󰗼 Exit Sway session?' \
+        -B '󰗼 Exit Sway' 'swaymsg exit' \
+        -B '󰐥 Shutdown' 'systemctl poweroff' \
+        -B '󰜉 Reboot' 'systemctl reboot' \
+        -B '󰌾 Lock' 'swaylock'
+fi

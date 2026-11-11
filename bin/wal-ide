@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""
+wal-ide: Synchronize IDE (Antigravity IDE, Code - OSS, VS Code) themes with pywal colors.
+Preserves all user settings and updates workbench.colorCustomizations and editor.tokenColorCustomizations.
+"""
+
+import json
+import os
+import re
+
+COLORS_JSON = os.path.expanduser("~/.cache/wal/colors.json")
+
+SETTINGS_PATHS = [
+    os.path.expanduser("~/.config/Antigravity IDE/User/settings.json"),
+    os.path.expanduser("~/.config/Code - OSS/User/settings.json"),
+    os.path.expanduser("~/.config/Code/User/settings.json"),
+    os.path.expanduser("~/.config/VSCodium/User/settings.json"),
+]
+
+def load_jsonc(filepath):
+    """Load JSON file, safely stripping line comments."""
+    if not os.path.exists(filepath):
+        return {}
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+    # Strip single line comments // ... but not within strings
+    cleaned = re.sub(r'^\s*//.*$', '', content, flags=re.MULTILINE)
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        # Fallback if empty or parsing failed
+        return {}
+
+def darken(hex_color, factor=0.85):
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) != 6:
+        return f"#{hex_color}"
+    r, g, b = [int(hex_color[i:i+2], 16) for i in (0, 2, 4)]
+    r, g, b = max(0, min(255, int(r * factor))), max(0, min(255, int(g * factor))), max(0, min(255, int(b * factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def main():
+    if not os.path.exists(COLORS_JSON):
+        print(f"Colors file {COLORS_JSON} not found. Run wal first.")
+        return
+
+    with open(COLORS_JSON, "r", encoding="utf-8") as f:
+        wal = json.load(f)
+
+    c = wal["colors"]
+    bg = wal["special"]["background"]
+    fg = wal["special"]["foreground"]
+
+    bg_dark = darken(bg, 0.85)
+    bg_darker = darken(bg, 0.70)
+    bg_light = darken(bg, 1.25)
+    accent = c["color4"]
+    accent_alt = c["color2"]
+
+    color_customizations = {
+        # Base Editor
+        "editor.background": bg,
+        "editor.foreground": fg,
+        "editorLineNumber.foreground": c["color8"],
+        "editorLineNumber.activeForeground": accent,
+        "editorCursor.foreground": accent,
+        "editor.selectionBackground": c["color0"] + "99",
+        "editor.lineHighlightBackground": bg_light + "33",
+
+        # Activity Bar
+        "activityBar.background": bg_darker,
+        "activityBar.foreground": accent,
+        "activityBar.inactiveForeground": c["color8"],
+        "activityBarBadge.background": accent,
+        "activityBarBadge.foreground": bg_darker,
+        "activityBar.border": bg_darker,
+
+        # Side Bar
+        "sideBar.background": bg_dark,
+        "sideBar.foreground": fg,
+        "sideBar.border": bg_darker,
+        "sideBarTitle.foreground": accent,
+        "sideBarSectionHeader.background": bg,
+        "sideBarSectionHeader.foreground": accent,
+
+        # Status Bar
+        "statusBar.background": bg_darker,
+        "statusBar.foreground": fg,
+        "statusBar.border": bg_darker,
+        "statusBarItem.remoteBackground": accent,
+        "statusBarItem.remoteForeground": bg_darker,
+        "statusBarItem.hoverBackground": bg,
+
+        # Title Bar
+        "titleBar.activeBackground": bg_darker,
+        "titleBar.activeForeground": fg,
+        "titleBar.inactiveBackground": bg_darker,
+        "titleBar.inactiveForeground": c["color8"],
+        "titleBar.border": bg_darker,
+
+        # Tabs & Editor Groups
+        "tab.activeBackground": bg,
+        "tab.activeForeground": accent,
+        "tab.inactiveBackground": bg_dark,
+        "tab.inactiveForeground": c["color8"],
+        "tab.activeBorder": accent,
+        "tab.border": bg_darker,
+        "editorGroupHeader.tabsBackground": bg_dark,
+        "editorGroupHeader.tabsBorder": bg_darker,
+
+        # Panels (Terminal, Output, Problems)
+        "panel.background": bg,
+        "panel.border": bg_darker,
+        "panelTitle.activeForeground": accent,
+        "panelTitle.activeBorder": accent,
+        "panelTitle.inactiveForeground": c["color8"],
+
+        # Integrated Terminal ANSI Palette
+        "terminal.background": bg,
+        "terminal.foreground": fg,
+        "terminal.ansiBlack": c["color0"],
+        "terminal.ansiRed": c["color1"],
+        "terminal.ansiGreen": c["color2"],
+        "terminal.ansiYellow": c["color3"],
+        "terminal.ansiBlue": c["color4"],
+        "terminal.ansiMagenta": c["color5"],
+        "terminal.ansiCyan": c["color6"],
+        "terminal.ansiWhite": c["color7"],
+        "terminal.ansiBrightBlack": c["color8"],
+        "terminal.ansiBrightRed": c["color9"],
+        "terminal.ansiBrightGreen": c["color10"],
+        "terminal.ansiBrightYellow": c["color11"],
+        "terminal.ansiBrightBlue": c["color12"],
+        "terminal.ansiBrightMagenta": c["color13"],
+        "terminal.ansiBrightCyan": c["color14"],
+        "terminal.ansiBrightWhite": c["color15"]
+    }
+
+    token_customizations = {
+        "comments": c["color8"],
+        "keywords": accent,
+        "strings": accent_alt,
+        "functions": c["color5"],
+        "variables": fg,
+        "types": c["color3"],
+        "numbers": c["color6"]
+    }
+
+    updated_count = 0
+    for settings_path in SETTINGS_PATHS:
+        user_dir = os.path.dirname(settings_path)
+        if not os.path.isdir(user_dir):
+            continue
+
+        settings = load_jsonc(settings_path)
+        settings["workbench.colorCustomizations"] = color_customizations
+        settings["editor.tokenColorCustomizations"] = token_customizations
+
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=4)
+        print(f"Updated IDE theme: {settings_path}")
+        updated_count += 1
+
+    if updated_count == 0:
+        print("No IDE configuration directories found.")
+
+if __name__ == "__main__":
+    main()

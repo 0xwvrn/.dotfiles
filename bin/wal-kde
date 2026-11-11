@@ -1,0 +1,384 @@
+#!/usr/bin/env python3
+"""
+wal-kde: Generates a matching KDE color scheme and Qt QSS stylesheet for Dolphin.
+Guarantees:
+- Crisp, bright, light text on dark backgrounds across all views and widgets.
+- A distinct 3rd color for selection so it contrasts with folder icons (which use color4).
+- Dark text for selected items so the file/folder name remains crystal-clear when selected.
+"""
+
+import json
+import os
+import math
+import configparser
+
+COLORS_JSON = os.path.expanduser("~/.cache/wal/colors.json")
+KDEGLOBALS = os.path.expanduser("~/.config/kdeglobals")
+DOLPHINRC = os.path.expanduser("~/.config/dolphinrc")
+SCHEME_DIR = os.path.expanduser("~/.local/share/color-schemes")
+SCHEME_FILE = os.path.join(SCHEME_DIR, "Pywal.colors")
+DOLPHIN_QSS = os.path.expanduser("~/.cache/wal/dolphin.qss")
+DOLPHIN_SEL_TEXT_FILE = os.path.expanduser("~/.cache/wal/dolphin-selected-text")
+
+def hex_to_rgb(h):
+    h = h.lstrip('#')
+    return f"{int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)}"
+
+def hex_to_rgb_tuple(h):
+    h = h.lstrip('#')
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+def get_lum(h):
+    r, g, b = hex_to_rgb_tuple(h)
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+def color_dist(h1, h2):
+    r1, g1, b1 = hex_to_rgb_tuple(h1)
+    r2, g2, b2 = hex_to_rgb_tuple(h2)
+    return math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2)
+
+def darken(hex_color, factor=0.85):
+    r, g, b = hex_to_rgb_tuple(hex_color)
+    r, g, b = max(0, min(255, int(r * factor))), max(0, min(255, int(g * factor))), max(0, min(255, int(g * factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def lighten(hex_color, factor=1.25):
+    r, g, b = hex_to_rgb_tuple(hex_color)
+    r, g, b = min(255, int(r * factor)), min(255, int(g * factor)), min(255, int(b * factor))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def ensure_light(hex_str, min_lum=235):
+    """Ensure color has at least min_lum luminance while preserving tint."""
+    r, g, b = hex_to_rgb_tuple(hex_str)
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+    if lum < min_lum:
+        ratio = (min_lum - lum) / max(1.0, (255.0 - lum))
+        r = int(r + (255 - r) * ratio)
+        g = int(g + (255 - g) * ratio)
+        b = int(b + (255 - b) * ratio)
+    return f"{min(255, r)},{min(255, g)},{min(255, b)}"
+
+def ensure_light_hex(hex_str, min_lum=235):
+    rgb_str = ensure_light(hex_str, min_lum)
+    r, g, b = [int(x) for x in rgb_str.split(',')]
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def pick_distinct_selection_color(c, bg_hex, folder_hex):
+    """
+    Picks a color among color1..color6 that maximizes distance from folder_hex
+    and background to avoid blending with folder icons or view background.
+    """
+    candidates = ["color1", "color2", "color3", "color5", "color6"]
+    best_color = c["color1"]
+    max_score = -1.0
+
+    for key in candidates:
+        candidate_hex = c[key]
+        d_folder = color_dist(candidate_hex, folder_hex)
+        d_bg = color_dist(candidate_hex, bg_hex)
+        # Score favors distinction from folder icons while staying visible against bg
+        score = d_folder * 1.5 + d_bg
+        if score > max_score:
+            max_score = score
+            best_color = candidate_hex
+
+    return best_color
+
+def main():
+    if not os.path.exists(COLORS_JSON):
+        print("Colors file not found. Run wal first.")
+        return
+
+    with open(COLORS_JSON, "r", encoding="utf-8") as f:
+        wal = json.load(f)
+
+    c = wal["colors"]
+    bg_hex = wal["special"]["background"]
+    fg_hex = wal["special"]["foreground"]
+
+    is_dark = get_lum(bg_hex) < 128
+
+    bg_rgb = hex_to_rgb(bg_hex)
+    bg_dark_rgb = hex_to_rgb(darken(bg_hex, 0.80))
+    bg_darker_rgb = hex_to_rgb(darken(bg_hex, 0.65))
+    bg_light_rgb = hex_to_rgb(lighten(bg_hex, 1.20))
+    
+    # Folder icons in Breeze use color4
+    folder_hex = c["color4"]
+    folder_rgb = hex_to_rgb(folder_hex)
+    accent_hover_rgb = hex_to_rgb(c["color2"])
+    
+    # Pick distinct 3rd color for selection so folder icon and selection NEVER match
+    selection_hex = pick_distinct_selection_color(c, bg_hex, folder_hex)
+    selection_rgb = hex_to_rgb(selection_hex)
+    selection_hover_rgb = hex_to_rgb(lighten(selection_hex, 1.15))
+
+    if is_dark:
+        fg_normal_rgb = ensure_light(fg_hex, min_lum=238)
+        fg_normal_hex = ensure_light_hex(fg_hex, min_lum=238)
+        fg_dim_rgb = ensure_light(c["color8"], min_lum=180)
+        fg_active_rgb = ensure_light(c["color5"], min_lum=242)
+        fg_link_rgb = ensure_light(c["color6"], min_lum=215)
+        fg_neg_rgb = ensure_light(c["color1"], min_lum=200)
+        fg_pos_rgb = ensure_light(c["color2"], min_lum=220)
+        
+        # When selected: file/folder name becomes dark for contrast
+        if get_lum(selection_hex) >= 110:
+            fg_selection_rgb = "18,18,18"
+            fg_selection_hex = "#121212"
+        else:
+            fg_selection_rgb = "255,255,255"
+            fg_selection_hex = "#ffffff"
+    else:
+        fg_normal_rgb = hex_to_rgb(fg_hex)
+        fg_normal_hex = fg_hex
+        fg_dim_rgb = hex_to_rgb(c["color8"])
+        fg_active_rgb = hex_to_rgb(c["color5"])
+        fg_link_rgb = hex_to_rgb(c["color6"])
+        fg_neg_rgb = hex_to_rgb(c["color1"])
+        fg_pos_rgb = hex_to_rgb(c["color2"])
+        fg_selection_rgb = "18,18,18"
+        fg_selection_hex = "#121212"
+
+    # Persist selected text color for Dolphin C++ shim
+    os.makedirs(os.path.dirname(DOLPHIN_SEL_TEXT_FILE), exist_ok=True)
+    with open(DOLPHIN_SEL_TEXT_FILE, "w", encoding="utf-8") as f:
+        f.write(fg_selection_hex + "\n")
+
+    # 1. Generate QSS Stylesheet for Dolphin
+    bg_dark_hex = darken(bg_hex, 0.75)
+    bg_hover_hex = lighten(bg_hex, 1.35)
+
+    qss_content = f"""/* Pywal dynamic styling for Dolphin */
+QWidget {{
+    background-color: {bg_hex};
+    color: {fg_normal_hex};
+    selection-background-color: {selection_hex};
+    selection-color: {fg_selection_hex};
+}}
+
+QTreeView, QListView, QTableView, QAbstractItemView {{
+    background-color: {bg_hex};
+    color: {fg_normal_hex};
+    selection-background-color: {selection_hex};
+    selection-color: {fg_selection_hex};
+    border: none;
+    outline: none;
+}}
+
+QTreeView::item:hover, QListView::item:hover, QAbstractItemView::item:hover {{
+    background-color: {bg_hover_hex};
+    color: #ffffff;
+}}
+
+QTreeView::item:selected, QListView::item:selected, QAbstractItemView::item:selected, *:selected {{
+    background-color: {selection_hex} !important;
+    color: {fg_selection_hex} !important;
+}}
+
+QHeaderView::section {{
+    background-color: {bg_dark_hex};
+    color: {fg_normal_hex};
+    border: none;
+    padding: 5px;
+    font-weight: bold;
+}}
+
+QLineEdit {{
+    background-color: {bg_dark_hex};
+    color: {fg_normal_hex};
+    border: 1px solid {folder_hex};
+    padding: 3px 6px;
+    selection-background-color: {selection_hex};
+    selection-color: {fg_selection_hex};
+}}
+
+QToolBar {{
+    background-color: {bg_dark_hex};
+    border: none;
+    spacing: 4px;
+}}
+
+QToolButton {{
+    background-color: transparent;
+    color: {fg_normal_hex};
+    border: none;
+    padding: 4px;
+}}
+
+QToolButton:hover {{
+    background-color: {bg_hover_hex};
+    color: #ffffff;
+}}
+
+QScrollBar:vertical, QScrollBar:horizontal {{
+    background: {bg_dark_hex};
+    border: none;
+    width: 10px;
+    height: 10px;
+}}
+
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
+    background: {folder_hex};
+    min-height: 20px;
+    min-width: 20px;
+}}
+
+QStatusBar {{
+    background-color: {bg_dark_hex};
+    color: {fg_normal_hex};
+}}
+
+QLabel {{
+    color: {fg_normal_hex};
+}}
+"""
+
+    os.makedirs(os.path.dirname(DOLPHIN_QSS), exist_ok=True)
+    with open(DOLPHIN_QSS, "w", encoding="utf-8") as f:
+        f.write(qss_content)
+    print(f"Generated Dolphin QSS: {DOLPHIN_QSS}")
+
+    # 2. Generate KDE .colors scheme
+    os.makedirs(SCHEME_DIR, exist_ok=True)
+    scheme_content = f"""[General]
+ColorScheme=Pywal
+Name=Pywal
+shadeSortColumn=true
+
+[KDE]
+contrast=4
+
+[Colors:Window]
+BackgroundAlternate={bg_dark_rgb}
+BackgroundNormal={bg_rgb}
+DecorationFocus={folder_rgb}
+DecorationHover={accent_hover_rgb}
+ForegroundActive={fg_active_rgb}
+ForegroundInactive={fg_dim_rgb}
+ForegroundLink={fg_link_rgb}
+ForegroundNegative={fg_neg_rgb}
+ForegroundNeutral={fg_dim_rgb}
+ForegroundNormal={fg_normal_rgb}
+ForegroundPositive={fg_pos_rgb}
+ForegroundVisited={fg_link_rgb}
+
+[Colors:View]
+BackgroundAlternate={bg_light_rgb}
+BackgroundNormal={bg_rgb}
+DecorationFocus={folder_rgb}
+DecorationHover={accent_hover_rgb}
+ForegroundActive={fg_active_rgb}
+ForegroundInactive={fg_dim_rgb}
+ForegroundLink={fg_link_rgb}
+ForegroundNegative={fg_neg_rgb}
+ForegroundNeutral={fg_dim_rgb}
+ForegroundNormal={fg_normal_rgb}
+ForegroundPositive={fg_pos_rgb}
+ForegroundVisited={fg_link_rgb}
+
+[Colors:Button]
+BackgroundAlternate={bg_light_rgb}
+BackgroundNormal={bg_dark_rgb}
+DecorationFocus={folder_rgb}
+DecorationHover={accent_hover_rgb}
+ForegroundActive={fg_active_rgb}
+ForegroundInactive={fg_dim_rgb}
+ForegroundLink={fg_link_rgb}
+ForegroundNegative={fg_neg_rgb}
+ForegroundNeutral={fg_dim_rgb}
+ForegroundNormal={fg_normal_rgb}
+ForegroundPositive={fg_pos_rgb}
+ForegroundVisited={fg_link_rgb}
+
+[Colors:Selection]
+BackgroundAlternate={selection_hover_rgb}
+BackgroundNormal={selection_rgb}
+DecorationFocus={folder_rgb}
+DecorationHover={accent_hover_rgb}
+ForegroundActive={fg_selection_rgb}
+ForegroundInactive={fg_selection_rgb}
+ForegroundLink={fg_link_rgb}
+ForegroundNegative={fg_neg_rgb}
+ForegroundNeutral={fg_selection_rgb}
+ForegroundNormal={fg_selection_rgb}
+ForegroundPositive={fg_pos_rgb}
+ForegroundVisited={fg_link_rgb}
+
+[Colors:Header]
+BackgroundAlternate={bg_dark_rgb}
+BackgroundNormal={bg_rgb}
+DecorationFocus={folder_rgb}
+DecorationHover={accent_hover_rgb}
+ForegroundActive={fg_active_rgb}
+ForegroundInactive={fg_dim_rgb}
+ForegroundLink={fg_link_rgb}
+ForegroundNegative={fg_neg_rgb}
+ForegroundNeutral={fg_dim_rgb}
+ForegroundNormal={fg_normal_rgb}
+ForegroundPositive={fg_pos_rgb}
+ForegroundVisited={fg_link_rgb}
+
+[Colors:Tooltip]
+BackgroundAlternate={bg_dark_rgb}
+BackgroundNormal={bg_rgb}
+DecorationFocus={folder_rgb}
+DecorationHover={accent_hover_rgb}
+ForegroundActive={fg_active_rgb}
+ForegroundInactive={fg_dim_rgb}
+ForegroundLink={fg_link_rgb}
+ForegroundNegative={fg_neg_rgb}
+ForegroundNeutral={fg_dim_rgb}
+ForegroundNormal={fg_normal_rgb}
+ForegroundPositive={fg_pos_rgb}
+ForegroundVisited={fg_link_rgb}
+
+[WM]
+activeBackground={bg_rgb}
+activeBlend={folder_rgb}
+activeForeground={fg_normal_rgb}
+inactiveBackground={bg_darker_rgb}
+inactiveBlend={fg_dim_rgb}
+inactiveForeground={fg_dim_rgb}
+"""
+
+    with open(SCHEME_FILE, "w", encoding="utf-8") as f:
+        f.write(scheme_content)
+    print(f"Generated KDE colorscheme: {SCHEME_FILE}")
+
+    # 3. Update kdeglobals
+    if os.path.exists(KDEGLOBALS):
+        config = configparser.ConfigParser(interpolation=None)
+        config.optionxform = str
+        config.read(KDEGLOBALS, encoding="utf-8")
+
+        scheme_config = configparser.ConfigParser(interpolation=None)
+        scheme_config.optionxform = str
+        scheme_config.read_string(scheme_content)
+
+        for section in scheme_config.sections():
+            if not config.has_section(section):
+                config.add_section(section)
+            for key, val in scheme_config.items(section):
+                config.set(section, key, val)
+
+        with open(KDEGLOBALS, "w", encoding="utf-8") as f:
+            config.write(f, space_around_delimiters=False)
+        print("Updated kdeglobals")
+
+    # 4. Update dolphinrc
+    if os.path.exists(DOLPHINRC):
+        dconfig = configparser.ConfigParser(interpolation=None)
+        dconfig.optionxform = str
+        dconfig.read(DOLPHINRC, encoding="utf-8")
+
+        if not dconfig.has_section("UiSettings"):
+            dconfig.add_section("UiSettings")
+        dconfig.set("UiSettings", "ColorScheme", "Pywal")
+
+        with open(DOLPHINRC, "w", encoding="utf-8") as f:
+            dconfig.write(f, space_around_delimiters=False)
+        print("Updated dolphinrc")
+
+if __name__ == "__main__":
+    main()

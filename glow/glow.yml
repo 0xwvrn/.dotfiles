@@ -1,0 +1,15 @@
+# Glow Markdown Viewer configuration
+# Style name or JSON path (dark, light, dracula, tokyo-night, pink, notty, auto)
+style: "dark"
+
+# Show line numbers in TUI mode
+line-numbers: false
+
+# Use pager when output exceeds terminal height
+pager: true
+
+# Word-wrap at width (0 to disable)
+width: 100
+
+# Preserve newlines in output
+preserve-new-lines: true

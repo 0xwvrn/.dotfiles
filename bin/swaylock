@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Swaylock wrapper: dynamically stamps current battery percentage and executes swaylock
+
+WAL_FILE="${HOME}/.cache/wal/wal"
+COLORS_JSON="${HOME}/.cache/wal/colors.json"
+
+if [ -f "$WAL_FILE" ] && [ -f "$COLORS_JSON" ]; then
+    python3 -c '
+import os, subprocess, json
+
+wal_file = os.path.expanduser("~/.cache/wal/wal")
+colors_file = os.path.expanduser("~/.cache/wal/colors.json")
+try:
+    with open(wal_file) as f:
+        wallpaper = f.read().strip()
+    with open(colors_file) as f:
+        data = json.load(f)
+        bg = data["special"]["background"]
+        fg = data["special"]["foreground"]
+        accent = data["colors"]["color4"]
+
+    cap = ""
+    stat = ""
+    try:
+        with open("/sys/class/power_supply/BAT0/capacity") as f:
+            cap = f.read().strip() + "%"
+        with open("/sys/class/power_supply/BAT0/status") as f:
+            s = f.read().strip()
+            if s == "Charging":
+                stat = " ⚡"
+    except Exception:
+        pass
+
+    if cap:
+        out_path = "/tmp/swaylock-battery.png"
+        font_path = os.path.expanduser("~/.local/share/fonts/Inter/Inter-Bold.ttf")
+        if not os.path.exists(font_path):
+            font_path = os.path.expanduser("~/.local/share/fonts/JetBrains-Mono-Nerd-Font-Complete.ttf")
+        text = f"{cap}{stat}"
+        subprocess.run([
+            "magick", wallpaper,
+            "-gravity", "NorthEast",
+            "-fill", bg, "-stroke", accent, "-strokewidth", "1",
+            "-draw", "rectangle 40,40 170,74",
+            "-fill", fg, "-stroke", "none",
+            "-font", font_path, "-pointsize", "14",
+            "-draw", f"text 65,48 \"{text}\"",
+            out_path
+        ], check=True, stderr=subprocess.DEVNULL)
+except Exception:
+    pass
+' 2>/dev/null
+fi
+
+if [ -f "/tmp/swaylock-battery.png" ]; then
+    exec /usr/bin/swaylock -i "/tmp/swaylock-battery.png" "$@"
+else
+    exec /usr/bin/swaylock "$@"
+fi

@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# bt: Minimal terminal Bluetooth TUI using fzf and bluetoothctl
+
+set -e
+
+if [ -f "$HOME/.cache/wal/colors-fzf.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.cache/wal/colors-fzf.sh"
+fi
+
+if ! command -v fzf >/dev/null 2>&1; then
+    echo "Error: fzf is required." >&2
+    exit 1
+fi
+
+if ! systemctl is-active --quiet bluetooth.service; then
+    echo "Bluetooth service is not running."
+    exit 1
+fi
+
+show_menu() {
+    local power_status
+    power_status=$(bluetoothctl show | grep -q "Powered: yes" && echo "On" || echo "Off")
+
+    # Header actions
+    local actions
+    if [ "$power_status" = "On" ]; then
+        actions="[Toggle Power: Turn OFF]\n[Scan for new devices]"
+    else
+        actions="[Toggle Power: Turn ON]"
+    fi
+
+    # Paired & Known devices list with status
+    local device_list=""
+    while read -r _ mac name; do
+        if [ -n "$mac" ]; then
+            local info
+            info=$(bluetoothctl info "$mac" 2>/dev/null || true)
+            local status="Disconnected"
+            local icon="󰂲"
+            if echo "$info" | grep -q "Connected: yes"; then
+                status="Connected   "
+                icon="󰂱"
+            fi
+            device_list+="${icon} [${status}] ${name} (${mac})\n"
+        fi
+    done < <(bluetoothctl devices)
+
+    echo -e "${actions}\n${device_list}" | sed '/^$/d' | fzf \
+        --ansi \
+        --header="Bluetooth Manager (Powered: ${power_status}) | Enter: Select | ESC: Quit" \
+        --prompt="Bluetooth > " \
+        --layout=reverse \
+        --height=45% \
+        --border
+}
+
+chosen=$(show_menu)
+[ -z "$chosen" ] && exit 0
+
+case "$chosen" in
+    "[Toggle Power: Turn OFF]")
+        bluetoothctl power off
+        echo "Bluetooth powered off."
+        ;;
+    "[Toggle Power: Turn ON]")
+        bluetoothctl power on
+        echo "Bluetooth powered on."
+        ;;
+    "[Scan for new devices]")
+        echo "Scanning for Bluetooth devices for 6 seconds..."
+        bluetoothctl --timeout 6 scan on
+        exec "$0"
+        ;;
+    *)
+        # Extract MAC address from (XX:XX:XX:XX:XX:XX)
+        mac=$(echo "$chosen" | grep -oE '([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}')
+        if [ -n "$mac" ]; then
+            name=$(echo "$chosen" | sed -E 's/.*\] (.*) \(..:..:..:..:..:..\)/\1/')
+            
+            # Sub-action menu for the device
+            info=$(bluetoothctl info "$mac" 2>/dev/null || true)
+            is_connected=$(echo "$info" | grep -q "Connected: yes" && echo "yes" || echo "no")
+            
+            if [ "$is_connected" = "yes" ]; then
+                action_choice=$(echo -e "Disconnect\nRemove (Unpair)\nCancel" | fzf --prompt="${name} > " --height=25% --layout=reverse --border)
+                case "$action_choice" in
+                    "Disconnect")
+                        echo "Disconnecting from ${name}..."
+                        bluetoothctl disconnect "$mac"
+                        ;;
+                    "Remove (Unpair)")
+                        bluetoothctl remove "$mac"
+                        echo "Removed ${name}."
+                        ;;
+                esac
+            else
+                action_choice=$(echo -e "Connect\nPair & Trust\nRemove\nCancel" | fzf --prompt="${name} > " --height=25% --layout=reverse --border)
+                case "$action_choice" in
+                    "Connect")
+                        echo "Connecting to ${name}..."
+                        bluetoothctl connect "$mac"
+                        ;;
+                    "Pair & Trust")
+                        echo "Pairing with ${name}..."
+                        bluetoothctl pair "$mac"
+                        bluetoothctl trust "$mac"
+                        bluetoothctl connect "$mac"
+                        ;;
+                    "Remove")
+                        bluetoothctl remove "$mac"
+                        echo "Removed ${name}."
+                        ;;
+                esac
+            fi
+        fi
+        ;;
+esac

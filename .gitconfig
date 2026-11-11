@@ -1,0 +1,42 @@
+[user]
+	name = 0xwvrn
+	email = 0xwvrn@gmail.com
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential]
+	helper = store
+
+[core]
+	pager = delta
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	dark = true
+	line-numbers = true
+	side-by-side = false
+	syntax-theme = ansi
+	hyperlinks = true
+	features = decorations
+
+[delta "decorations"]
+	commit-decoration-style = bold box
+	file-style = bold 15
+	file-decoration-style = box
+	hunk-header-decoration-style = box
+	line-numbers-left-format = "{nm:>4} │ "
+	line-numbers-right-format = "{np:>4} │ "
+	line-numbers-left-style = 8
+	line-numbers-right-style = 8
+
+[merge]
+	conflictstyle = diff3
+
+[diff]
+	colorMoved = default

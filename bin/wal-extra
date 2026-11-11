@@ -1,0 +1,1238 @@
+#!/usr/bin/env python3
+"""
+wal-extra: Extends wallpaper-based theme synchronization to:
+- GTK 3.0 & GTK 4.0 (gtk.css with sharp 0px borders)
+- fzf (colors-fzf.sh for terminal fuzzy searching, wifi, and bt TUIs)
+- tmux (colors-tmux.conf and hot-reloads tmux sessions)
+- swaylock (config with matching wallpaper image & ring indicator colors)
+- Obsidian (accent color and pywal.css snippet for active vaults)
+- Shells (.bashrc, .zshrc terminal sequences and fzf setup)
+"""
+
+import json
+import os
+import glob
+import shutil
+import subprocess
+
+COLORS_JSON = os.path.expanduser("~/.cache/wal/colors.json")
+WAL_FILE = os.path.expanduser("~/.cache/wal/wal")
+
+def hex_to_rgb_tuple(h):
+    h = h.lstrip('#')
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+def get_lum(h):
+    r, g, b = hex_to_rgb_tuple(h)
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+def darken(hex_color, factor=0.85):
+    r, g, b = hex_to_rgb_tuple(hex_color)
+    r = max(0, min(255, int(r * factor)))
+    g = max(0, min(255, int(g * factor)))
+    b = max(0, min(255, int(b * factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def lighten(hex_color, factor=1.25):
+    r, g, b = hex_to_rgb_tuple(hex_color)
+    r = min(255, max(0, int(r * factor)))
+    g = min(255, max(0, int(g * factor)))
+    b = min(255, max(0, int(b * factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def blend_colors(hex1, hex2, ratio=0.5):
+    """Blends hex1 towards hex2 by ratio (0 = all hex1, 1 = all hex2)."""
+    r1, g1, b1 = hex_to_rgb_tuple(hex1)
+    r2, g2, b2 = hex_to_rgb_tuple(hex2)
+    r = int(r1 + (r2 - r1) * ratio)
+    g = int(g1 + (g2 - g1) * ratio)
+    b = int(b1 + (b2 - b1) * ratio)
+    return f"#{min(255, max(0, r)):02x}{min(255, max(0, g)):02x}{min(255, max(0, b)):02x}"
+
+def ensure_light_hex(hex_str, min_lum=235):
+    r, g, b = hex_to_rgb_tuple(hex_str)
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+    if lum < min_lum:
+        ratio = (min_lum - lum) / max(1.0, (255.0 - lum))
+        r = int(r + (255 - r) * ratio)
+        g = int(g + (255 - g) * ratio)
+        b = int(b + (255 - b) * ratio)
+    return f"#{min(255, r):02x}{min(255, g):02x}{min(255, b):02x}"
+
+def update_gtk(bg, fg, accent, selection_bg, selection_fg, bg_dark, hover_bg):
+    """Generates GTK 3 and GTK 4 css."""
+    css = f"""/* Pywal dynamic theme for GTK 3 & 4 */
+@define-color theme_bg_color {bg};
+@define-color theme_fg_color {fg};
+@define-color theme_base_color {bg};
+@define-color theme_text_color {fg};
+@define-color theme_selected_bg_color {selection_bg};
+@define-color theme_selected_fg_color {selection_fg};
+@define-color borders {accent};
+@define-color headerbar_bg_color {bg_dark};
+@define-color headerbar_fg_color {fg};
+@define-color popover_bg_color {bg_dark};
+@define-color popover_fg_color {fg};
+@define-color view_bg_color {bg};
+@define-color view_fg_color {fg};
+
+/* Sharp rectangular aesthetic (0px border-radius) */
+* {{
+    border-radius: 0px;
+    font-family: "Inter", sans-serif;
+}}
+
+window, dialog {{
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+}}
+
+/* Context Menus, Popovers, Dropdowns (Strict 0px Corners & Palette Matching) */
+window.popup,
+window.background.popup,
+.popup,
+menu,
+.menu,
+.context-menu,
+popover,
+.popover,
+popover.menu,
+popover > contents,
+popover.menu > contents,
+.popover > contents,
+.csd.popup {{
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+    border: 1px solid @borders;
+    border-radius: 0px;
+    box-shadow: none;
+    padding: 3px 0px;
+}}
+
+menubar, .menubar {{
+    background-color: @headerbar_bg_color;
+    color: @headerbar_fg_color;
+}}
+
+menuitem,
+.menuitem,
+modelbutton,
+.modelbutton {{
+    background-color: transparent;
+    color: @theme_fg_color;
+    border-radius: 0px;
+    padding: 5px 12px;
+    min-height: 22px;
+}}
+
+menuitem:hover,
+menuitem:selected,
+modelbutton:hover,
+modelbutton:selected {{
+    background-color: @theme_selected_bg_color;
+    color: @theme_selected_fg_color;
+    border-radius: 0px;
+}}
+
+menuitem label,
+modelbutton label {{
+    color: inherit;
+    font-family: "Inter", sans-serif;
+}}
+
+menuitem arrow,
+modelbutton arrow {{
+    color: inherit;
+}}
+
+separator,
+separator.horizontal,
+.menu-separator {{
+    background-color: @borders;
+    min-height: 1px;
+    margin: 4px 0px;
+}}
+"""
+    settings_ini = """[Settings]
+gtk-theme-name = Adwaita-dark
+gtk-application-prefer-dark-theme = 1
+gtk-font-name = Inter 10
+gtk-icon-theme-name = Adwaita
+gtk-cursor-theme-name = Adwaita
+gtk-cursor-theme-size = 24
+gtk-xft-antialias = 1
+gtk-xft-hinting = 1
+gtk-xft-hintstyle = hintslight
+gtk-xft-rgba = rgb
+"""
+    for gtk_dir in [os.path.expanduser("~/.config/gtk-3.0"), os.path.expanduser("~/.config/gtk-4.0")]:
+        os.makedirs(gtk_dir, exist_ok=True)
+        path = os.path.join(gtk_dir, "gtk.css")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(css)
+        print(f"Updated GTK CSS: {path}")
+        ini_path = os.path.join(gtk_dir, "settings.ini")
+        with open(ini_path, "w", encoding="utf-8") as f:
+            f.write(settings_ini)
+
+def update_fzf(bg, fg, c, bg_dark):
+    """Generates colors-fzf.sh with pywal palette."""
+    fzf_sh = os.path.expanduser("~/.cache/wal/colors-fzf.sh")
+    content = f"""# Pywal dynamic colors for fzf
+export FZF_DEFAULT_OPTS="
+  --color=bg+:{bg_dark},bg:{bg},spinner:{c['color5']},hl:{c['color2']}
+  --color=fg:{fg},header:{c['color2']},info:{c['color4']},pointer:{c['color5']}
+  --color=marker:{c['color5']},fg+:{fg},prompt:{c['color4']},hl+:{c['color2']}
+  --color=border:{c['color4']}
+"
+"""
+    with open(fzf_sh, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Updated fzf theme: {fzf_sh}")
+
+def update_tmux(bg, fg, accent, c, bg_dark, on_accent, surface):
+    """Generates colors-tmux.conf and hot-reloads running tmux sessions."""
+    tmux_conf = os.path.expanduser("~/.cache/wal/colors-tmux.conf")
+    content = f"""# Pywal dynamic colors for tmux (sharp, modern aesthetic)
+set -g status on
+set -g status-interval 2
+set -g status-position bottom
+set -g status-justify left
+
+# Terminal colors (24-bit Truecolor)
+set -g default-terminal "tmux-256color"
+set -as terminal-features ",*:RGB"
+
+# Bar background and text
+set -g status-style "bg={bg_dark},fg={fg}"
+
+# Status Left & Right
+set -g status-left "#[bg={accent},fg={on_accent},bold]  #S  #[bg={bg_dark},fg={accent}] "
+set -g status-left-length 30
+set -g status-right "#[bg={surface},fg={fg}]  %H:%M  #[bg={accent},fg={on_accent},bold]  %d-%b  "
+set -g status-right-length 50
+
+# Windows
+set -g window-status-separator ""
+set -g window-status-format "#[fg={c['color8']},bg={bg_dark}]  #I: #W  "
+set -g window-status-current-format "#[fg={on_accent},bg={accent},bold]  #I: #W  "
+
+# Panes
+set -g pane-border-style "fg={darken(bg, 0.70)}"
+set -g pane-active-border-style "fg={accent}"
+
+# Command / Message / Mode
+set -g message-style "bg={accent},fg={on_accent},bold"
+set -g message-command-style "bg={accent},fg={on_accent},bold"
+set -g mode-style "bg={accent},fg={on_accent},bold"
+"""
+    with open(tmux_conf, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Updated tmux theme: {tmux_conf}")
+
+    # Ensure ~/.config/tmux/tmux.conf sources it
+    for user_tmux in [os.path.expanduser("~/.config/tmux/tmux.conf"), os.path.expanduser("~/.tmux.conf")]:
+        if os.path.exists(user_tmux) and not os.path.islink(user_tmux):
+            with open(user_tmux, "r", encoding="utf-8") as f:
+                cfg_text = f.read()
+            if "colors-tmux.conf" not in cfg_text:
+                with open(user_tmux, "a", encoding="utf-8") as f:
+                    f.write('\n# Dynamic Pywal theme (loads after TPM to ensure wallpaper colors take effect)\nif-shell "[ -f ~/.cache/wal/colors-tmux.conf ]" "source-file ~/.cache/wal/colors-tmux.conf"\n')
+                print(f"Added colors-tmux.conf include to {user_tmux}")
+
+    # Hot reload running tmux sessions if any server is running
+    try:
+        subprocess.run(["tmux", "source-file", tmux_conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    except Exception:
+        pass
+
+def render_swaylock_battery_image(wallpaper_path, bg, fg, accent):
+    """Renders wallpaper with sharp 0px rectangular battery badge in top right."""
+    cap = ""
+    stat = ""
+    try:
+        with open("/sys/class/power_supply/BAT0/capacity") as f:
+            cap = f.read().strip() + "%"
+        with open("/sys/class/power_supply/BAT0/status") as f:
+            s = f.read().strip()
+            if s == "Charging":
+                stat = " ⚡"
+    except Exception:
+        pass
+
+    if not cap:
+        return wallpaper_path
+
+    out_path = "/tmp/swaylock-battery.png"
+    font_path = os.path.expanduser("~/.local/share/fonts/Inter/Inter-Bold.ttf")
+    if not os.path.exists(font_path):
+        font_path = os.path.expanduser("~/.local/share/fonts/JetBrains-Mono-Nerd-Font-Complete.ttf")
+
+    text = f"{cap}{stat}"
+    cmd = [
+        "magick", wallpaper_path,
+        "-gravity", "NorthEast",
+        "-fill", bg, "-stroke", accent, "-strokewidth", "1",
+        "-draw", "rectangle 40,40 170,74",
+        "-fill", fg, "-stroke", "none",
+        "-font", font_path, "-pointsize", "14",
+        "-draw", f"text 65,48 \"{text}\"",
+        out_path
+    ]
+    try:
+        subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
+        return out_path
+    except Exception:
+        return wallpaper_path
+
+def update_swaylock(wallpaper_path, bg, fg, accent, c):
+    """Generates ~/.config/swaylock/config matching current wallpaper."""
+    swaylock_dir = os.path.expanduser("~/.config/swaylock")
+    os.makedirs(swaylock_dir, exist_ok=True)
+    cfg_file = os.path.join(swaylock_dir, "config")
+
+    # Also ensure ~/.swaylock links to ~/.config/swaylock for full compatibility
+    legacy_dir = os.path.expanduser("~/.swaylock")
+    if not os.path.exists(legacy_dir):
+        try:
+            os.symlink(swaylock_dir, legacy_dir)
+        except Exception:
+            pass
+
+    lock_img = render_swaylock_battery_image(wallpaper_path, bg, fg, accent)
+
+    bg_clean = bg.lstrip('#')
+    fg_clean = fg.lstrip('#')
+    accent_clean = accent.lstrip('#')
+    c1 = c['color1'].lstrip('#')
+    c2 = c['color2'].lstrip('#')
+    c4 = c['color4'].lstrip('#')
+    c5 = c['color5'].lstrip('#')
+
+    content = f"""# Pywal dynamic configuration for swaylock
+image={lock_img}
+color={bg_clean}
+scaling=fill
+daemonize
+indicator-idle-visible
+show-failed-attempts
+ignore-empty-password
+font="Noto Sans"
+
+indicator-radius=100
+indicator-thickness=7
+
+inside-color={bg_clean}cc
+inside-clear-color={bg_clean}cc
+inside-ver-color={bg_clean}cc
+inside-wrong-color={c1}cc
+
+ring-color={accent_clean}
+ring-clear-color={c2}
+ring-ver-color={c4}
+ring-wrong-color={c1}
+
+key-hl-color={c5}
+bs-hl-color={c1}
+
+text-color={fg_clean}
+text-clear-color={fg_clean}
+text-ver-color={fg_clean}
+text-wrong-color={fg_clean}
+
+line-color=00000000
+line-clear-color=00000000
+line-ver-color=00000000
+line-wrong-color=00000000
+
+separator-color=00000000
+"""
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Updated swaylock theme: {cfg_file}")
+
+def update_sddm(wallpaper_path, bg, fg, accent, c, bg_dark, on_accent):
+    """Generates SDDM theme config & copies wallpaper if theme is writable."""
+    theme_dir = "/usr/share/sddm/themes/sddm-gruvbox"
+    if not os.path.isdir(theme_dir) or not os.access(theme_dir, os.W_OK):
+        return
+
+    ext = os.path.splitext(wallpaper_path)[1] or ".jpg"
+    dest_bg = os.path.join(theme_dir, f"background{ext}")
+    try:
+        shutil.copyfile(wallpaper_path, dest_bg)
+        os.chmod(dest_bg, 0o644)
+    except Exception as e:
+        print(f"Warning: could not copy wallpaper to SDDM theme: {e}")
+        dest_bg = ""
+
+    bg_name = f"background{ext}" if dest_bg else ""
+    cfg_file = os.path.join(theme_dir, "theme.conf")
+
+    content = f"""[General]
+Font="Noto Sans"
+FontSize=10
+Background="{bg_name}"
+PasswordShowLastLetter=1000
+
+# [Colors]
+hower     = "{accent}"
+text      = "{fg}"
+surface2  = "{c['color5']}"
+surface1  = "{c['color8']}"
+surface0  = "{bg_dark}"
+overlay   = "{c['color1']}"
+border    = "{accent}"
+base      = "{bg}"
+Primary   = "{accent}"
+onPrimary = "{on_accent}"
+
+## [Locale Settings]
+Locale=""
+HourFormat="hh:mm A"
+DateFormat = "ddd dd/MM/yy"
+"""
+    try:
+        with open(cfg_file, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"Updated SDDM theme: {cfg_file}")
+    except Exception as e:
+        print(f"Warning: could not update SDDM theme: {e}")
+
+def update_swaynag(bg, fg, accent, c, bg_dark, is_dark):
+    """Generates ~/.config/swaynag/config matching wallpaper palette."""
+    cfg_dir = os.path.expanduser("~/.config/swaynag")
+    os.makedirs(cfg_dir, exist_ok=True)
+    cfg_path = os.path.join(cfg_dir, "config")
+
+    bg_raw = bg.lstrip('#')
+    fg_raw = fg.lstrip('#')
+    accent_raw = accent.lstrip('#')
+    border_raw = blend_colors(bg, fg, 0.22).lstrip('#')
+    btn_bg_raw = blend_colors(bg, fg, 0.12).lstrip('#')
+    bar_bg_raw = blend_colors(bg, fg, 0.07).lstrip('#')
+    accent_line_raw = c['color6'].lstrip('#') if is_dark else accent_raw
+
+    content = f"""# Dynamic Pywal theme for swaynag
+font=JetBrainsMono Nerd Font 10
+edge=bottom
+layer=overlay
+message-padding=8
+button-padding=6
+button-gap=8
+button-dismiss-gap=12
+button-margin-right=15
+button-border-size=1
+border-bottom-size=2
+
+background={bar_bg_raw}
+border={border_raw}
+border-bottom={accent_line_raw}
+button-background={btn_bg_raw}
+button-text={fg_raw}
+text={fg_raw}
+
+[warning]
+background={bar_bg_raw}
+border={border_raw}
+border-bottom={accent_line_raw}
+button-background={btn_bg_raw}
+button-text={fg_raw}
+text={fg_raw}
+
+[error]
+background={bar_bg_raw}
+border=e06c75
+border-bottom=e06c75
+button-background={btn_bg_raw}
+button-text={fg_raw}
+text={fg_raw}
+"""
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Updated swaynag theme: {cfg_path}")
+
+def update_obsidian(bg, fg, accent, c, bg_dark, is_dark):
+    """Updates Obsidian vaults with high-contrast pywal accent, full theme, and CSS snippet."""
+    obsidian_json = os.path.expanduser("~/.config/obsidian/obsidian.json")
+    if not os.path.exists(obsidian_json):
+        return
+
+    try:
+        with open(obsidian_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        vaults = data.get("vaults", {})
+    except Exception:
+        return
+
+    if is_dark:
+        bg_dark = blend_colors(bg, fg, 0.05)
+        bg_darker = blend_colors(bg, "#000000", 0.40)
+        bg_subtle = blend_colors(bg, fg, 0.08)
+        hover_bg = blend_colors(bg, fg, 0.12)
+        border_color = blend_colors(bg, fg, 0.18)
+        fg_normal = ensure_light_hex(fg, min_lum=215)
+        fg_muted = ensure_light_hex(c['color8'], min_lum=140)
+        fg_faint = ensure_light_hex(c['color8'], min_lum=110)
+        icon_col = ensure_light_hex(c['color7'], min_lum=190)
+        icon_hover = "#ffffff"
+        accent_bright = ensure_light_hex(accent, min_lum=135)
+        h1 = ensure_light_hex(c['color1'], min_lum=135)
+        h2 = ensure_light_hex(c['color2'], min_lum=140)
+        h3 = ensure_light_hex(c['color3'], min_lum=140)
+        h4 = ensure_light_hex(c['color4'], min_lum=140)
+        h5 = ensure_light_hex(c['color5'], min_lum=145)
+        h6 = ensure_light_hex(c['color6'], min_lum=140)
+        code_fg = ensure_light_hex(c['color5'], min_lum=150)
+        link_fg = ensure_light_hex(c['color4'], min_lum=140)
+        tag_fg = ensure_light_hex(c['color2'], min_lum=140)
+    else:
+        bg_dark = blend_colors(bg, "#000000", 0.05)
+        bg_darker = blend_colors(bg, "#000000", 0.10)
+        bg_subtle = blend_colors(bg, "#000000", 0.08)
+        hover_bg = blend_colors(bg, "#000000", 0.12)
+        border_color = blend_colors(bg, "#000000", 0.18)
+        fg_normal = fg
+        fg_muted = c['color8']
+        fg_faint = c['color8']
+        icon_col = fg
+        icon_hover = "#121212"
+        accent_bright = accent
+        h1 = c['color1']
+        h2 = c['color2']
+        h3 = c['color3']
+        h4 = c['color4']
+        h5 = c['color5']
+        h6 = c['color6']
+        code_fg = c['color5']
+        link_fg = c['color4']
+        tag_fg = c['color2']
+
+    r, g, b = hex_to_rgb_tuple(accent_bright)
+
+    css_snippet = f"""/* Pywal dynamic theme for Obsidian */
+body, body.theme-dark, body.theme-light, :root, .theme-dark, .theme-light {{
+    /* Standard Palette Variables */
+    --color-red: {ensure_light_hex(c['color1'], min_lum=135)} !important;
+    --color-orange: {ensure_light_hex(c['color3'], min_lum=140)} !important;
+    --color-yellow: {ensure_light_hex(c['color5'], min_lum=145)} !important;
+    --color-green: {ensure_light_hex(c['color2'], min_lum=140)} !important;
+    --color-cyan: {ensure_light_hex(c['color6'], min_lum=140)} !important;
+    --color-blue: {ensure_light_hex(c['color4'], min_lum=140)} !important;
+    --color-purple: {ensure_light_hex(c['color1'], min_lum=135)} !important;
+    --color-pink: {ensure_light_hex(c['color6'], min_lum=140)} !important;
+
+    /* Base Color Palette */
+    --color-base-00: {bg} !important;
+    --color-base-10: {bg_dark} !important;
+    --color-base-20: {bg_dark} !important;
+    --color-base-25: {bg_darker} !important;
+    --color-base-30: {border_color} !important;
+    --color-base-35: {accent_bright} !important;
+    --color-base-40: {accent_bright} !important;
+    --color-base-50: {fg_muted} !important;
+    --color-base-60: {fg_normal} !important;
+    --color-base-70: {fg_normal} !important;
+    --color-base-100: #ffffff !important;
+
+    /* Backgrounds */
+    --background-primary: {bg} !important;
+    --background-primary-alt: {bg_dark} !important;
+    --background-secondary: {bg_dark} !important;
+    --background-secondary-alt: {bg_darker} !important;
+    --background-modifier-border: {border_color} !important;
+    --background-modifier-border-hover: {accent_bright} !important;
+    --background-modifier-border-focus: {accent_bright} !important;
+    --background-modifier-form-field: {bg_darker} !important;
+    --background-accent: {accent_bright} !important;
+
+    /* Accent & Brand */
+    --color-accent: {accent_bright} !important;
+    --color-accent-1: {darken(accent_bright, 0.85)} !important;
+    --color-accent-2: {lighten(accent_bright, 1.15)} !important;
+    --interactive-accent: {accent_bright} !important;
+    --interactive-accent-hover: {lighten(accent_bright, 1.15)} !important;
+    --interactive-accent-rgb: {r}, {g}, {b} !important;
+
+    /* Text & Headings */
+    --text-normal: {fg_normal} !important;
+    --text-muted: {fg_muted} !important;
+    --text-faint: {fg_faint} !important;
+    --text-accent: {accent_bright} !important;
+    --text-accent-hover: {lighten(accent_bright, 1.15)} !important;
+    --bold-color: {fg_normal} !important;
+    --italic-color: {fg_normal} !important;
+    --inline-title-color: {fg_normal} !important;
+
+    /* Distinct Palette Headings */
+    --h1-color: {h1} !important;
+    --h2-color: {h2} !important;
+    --h3-color: {h3} !important;
+    --h4-color: {h4} !important;
+    --h5-color: {h5} !important;
+    --h6-color: {h6} !important;
+
+    /* Icons */
+    --icon-color: {icon_col} !important;
+    --icon-color-hover: {icon_hover} !important;
+    --icon-color-active: {accent_bright} !important;
+    --icon-color-focused: {accent_bright} !important;
+    --clickable-icon: {icon_col} !important;
+    --ribbon-icon-color: {icon_col} !important;
+    --ribbon-icon-color-hover: {icon_hover} !important;
+    --ribbon-icon-color-active: {accent_bright} !important;
+    --nav-collapse-icon-color: {icon_col} !important;
+    --tab-icon-color: {icon_col} !important;
+
+    /* Navigation / File Tree */
+    --nav-item-color: {fg_normal} !important;
+    --nav-item-color-hover: #ffffff !important;
+    --nav-item-color-active: {accent_bright} !important;
+    --nav-item-color-selected: #ffffff !important;
+    --nav-item-background-hover: {hover_bg} !important;
+    --nav-item-background-active: {bg_subtle} !important;
+
+    /* Tabs */
+    --tab-text-color: {fg_muted} !important;
+    --tab-text-color-active: #ffffff !important;
+    --tab-text-color-focused: #ffffff !important;
+    --tab-text-color-focused-active: {accent_bright} !important;
+    --tab-background-active: {bg} !important;
+
+    /* Code Blocks & Links */
+    --code-normal: {code_fg} !important;
+    --code-background: {bg_darker} !important;
+    --link-color: {link_fg} !important;
+    --link-color-hover: {lighten(link_fg, 1.15)} !important;
+    --link-external-color: {link_fg} !important;
+    --tag-color: {tag_fg} !important;
+    --tag-background: {blend_colors(bg, accent_bright, 0.15)} !important;
+    --tag-border-color: {border_color} !important;
+
+    /* Form Inputs & Search */
+    --input-shadow: none !important;
+    --input-shadow-hover: none !important;
+
+    /* Fonts & Shapes (Inter & Strict 0px Corners) */
+    --font-interface: "Inter", sans-serif !important;
+    --font-text: "Inter", sans-serif !important;
+    --font-monospace: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace !important;
+    --radius-xs: 0px !important;
+    --radius-s: 0px !important;
+    --radius-m: 0px !important;
+    --radius-l: 0px !important;
+    --radius-xl: 0px !important;
+    --modal-radius: 0px !important;
+    --menu-radius: 0px !important;
+    --prompt-radius: 0px !important;
+    --tab-radius: 0px !important;
+    --tab-radius-active: 0px !important;
+}}
+
+/* Ensure all SVG icons in ribbons, sidebars, tabs, and explorer render crisp and visible */
+svg.svg-icon,
+.clickable-icon svg,
+.nav-action-button svg,
+.workspace-tab-header-inner-icon svg,
+.side-dock-ribbon-action svg {{
+    color: var(--icon-color) !important;
+}}
+
+.clickable-icon:hover svg,
+.side-dock-ribbon-action:hover svg {{
+    color: var(--icon-color-hover) !important;
+}}
+
+/* File Explorer text & folders */
+.nav-file-title,
+.nav-folder-title,
+.tree-item-inner {{
+    color: var(--text-normal) !important;
+}}
+
+.nav-folder-collapse-indicator svg {{
+    color: var(--nav-collapse-icon-color) !important;
+}}
+
+/* Explicit Headings (reading and live preview) */
+h1, .HyperMD-header-1, .cm-header-1 {{ color: var(--h1-color) !important; }}
+h2, .HyperMD-header-2, .cm-header-2 {{ color: var(--h2-color) !important; }}
+h3, .HyperMD-header-3, .cm-header-3 {{ color: var(--h3-color) !important; }}
+h4, .HyperMD-header-4, .cm-header-4 {{ color: var(--h4-color) !important; }}
+h5, .HyperMD-header-5, .cm-header-5 {{ color: var(--h5-color) !important; }}
+h6, .HyperMD-header-6, .cm-header-6 {{ color: var(--h6-color) !important; }}
+
+/* Lists & Markers */
+.markdown-rendered ol > li::marker,
+.markdown-rendered ul > li::marker,
+.cm-formatting-list {{
+    color: var(--text-accent) !important;
+}}
+
+/* Checkboxes */
+input[type="checkbox"],
+.task-list-item-checkbox {{
+    border: 1px solid var(--text-muted) !important;
+    background-color: var(--background-modifier-form-field) !important;
+}}
+
+input[type="checkbox"]:checked,
+.task-list-item-checkbox:checked {{
+    background-color: var(--interactive-accent) !important;
+    border-color: var(--interactive-accent) !important;
+}}
+
+/* Blockquotes */
+blockquote,
+.markdown-rendered blockquote {{
+    border-left: 3px solid var(--interactive-accent) !important;
+    color: var(--text-muted) !important;
+}}
+
+/* Caret & Selection */
+.cm-cursor {{
+    border-left-color: var(--text-normal) !important;
+}}
+::selection,
+.cm-selectionBackground {{
+    background-color: rgba({r}, {g}, {b}, 0.35) !important;
+}}
+
+/* Editor & Markdown Content */
+.workspace-leaf,
+.workspace-split,
+.workspace-tabs,
+.view-content,
+.markdown-source-view,
+.markdown-preview-view,
+.cm-scroller,
+/* .workspace-ribbon */
+.side-dock-ribbon {{
+    background-color: var(--background-primary) !important;
+    color: var(--text-normal) !important;
+}}
+
+/* Titlebar completely hidden */
+.titlebar {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    border: none !important;
+}}
+
+.workspace-ribbon.mod-primary {{
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}}
+
+/* Sidebar Toggle Buttons (Collapse/Expand Left & Right) - Natural non-overlapping layout */
+.sidebar-toggle-button {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    opacity: 0.9 !important;
+    color: var(--icon-color) !important;
+    border-radius: 0px !important;
+}}
+
+.sidebar-toggle-button.mod-left,
+.mod-left-split-toggle {{
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    height: var(--header-height, 40px) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-bottom: 4px !important;
+}}
+
+.sidebar-toggle-button.mod-right {{
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}}
+
+.sidebar-toggle-button:hover {{
+    opacity: 1 !important;
+    color: var(--icon-color-hover) !important;
+    background-color: var(--background-modifier-hover) !important;
+}}
+
+.sidebar-toggle-button svg {{
+    width: 18px !important;
+    height: 18px !important;
+    display: block !important;
+    color: var(--icon-color) !important;
+}}
+
+.sidebar-toggle-icon-outer {{
+    fill: none !important;
+    stroke: var(--icon-color) !important;
+    stroke-width: 2px !important;
+}}
+
+.sidebar-toggle-icon-inner {{
+    fill: var(--icon-color) !important;
+    stroke: none !important;
+}}
+
+.sidebar-toggle-button:hover .sidebar-toggle-icon-outer {{
+    stroke: var(--icon-color-hover) !important;
+}}
+
+.sidebar-toggle-button:hover .sidebar-toggle-icon-inner {{
+    fill: var(--icon-color-hover) !important;
+}}
+
+.workspace-tab-header-container {{
+    background-color: var(--background-secondary) !important;
+    border-bottom: 1px solid var(--background-modifier-border) !important;
+}}
+
+.workspace-tab-header.is-active {{
+    background-color: var(--background-primary) !important;
+    border-top: 2px solid var(--interactive-accent) !important;
+}}
+
+.workspace-tab-header.is-active .workspace-tab-header-inner-title {{
+    color: var(--interactive-accent) !important;
+    font-weight: 600 !important;
+}}
+
+.nav-file-title.is-active,
+.tree-item-self.is-active {{
+    background-color: rgba({r}, {g}, {b}, 0.22) !important;
+    color: #ffffff !important;
+    border-left: 2px solid var(--interactive-accent) !important;
+}}
+
+/* Graph View Colors */
+.graph-view.color-line {{
+    color: {border_color} !important;
+}}
+.graph-view.color-fill {{
+    color: {accent_bright} !important;
+}}
+.graph-view.color-fill-focused {{
+    color: {h2} !important;
+}}
+.graph-view.color-fill-tag {{
+    color: {tag_fg} !important;
+}}
+.graph-view.color-fill-attachment {{
+    color: {code_fg} !important;
+}}
+
+/* Menus & Popups (Strict 0px Corners & Palette Matching) */
+.menu,
+.popover,
+.suggestion-container,
+.modal,
+.prompt {{
+    background-color: var(--background-secondary) !important;
+    color: var(--text-normal) !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    border-radius: 0px !important;
+    box-shadow: none !important;
+    z-index: 1000 !important;
+}}
+
+.menu-item {{
+    color: var(--text-normal) !important;
+    border-radius: 0px !important;
+}}
+
+.menu-item:hover,
+.menu-item.selected {{
+    background-color: var(--interactive-accent) !important;
+    color: #ffffff !important;
+    border-radius: 0px !important;
+}}
+
+.menu-item-icon {{
+    color: var(--icon-color) !important;
+}}
+
+/* Code blocks */
+.markdown-rendered code,
+.cm-inline-code,
+pre > code {{
+    color: var(--code-normal) !important;
+    background-color: var(--code-background) !important;
+}}
+
+/* Search & text inputs */
+input[type="text"],
+input[type="search"],
+textarea {{
+    background-color: var(--background-modifier-form-field) !important;
+    color: var(--text-normal) !important;
+    border: 1px solid var(--background-modifier-border) !important;
+}}
+
+input::placeholder,
+textarea::placeholder {{
+    color: var(--text-muted) !important;
+}}
+"""
+
+    manifest_json = json.dumps({
+        "name": "Pywal",
+        "version": "1.0.0",
+        "minAppVersion": "0.15.0",
+        "author": "Antigravity"
+    }, indent=2)
+
+    for vid, vinfo in vaults.items():
+        vpath = vinfo.get("path")
+        if not vpath or not os.path.isdir(vpath):
+            continue
+
+        # 1. Update snippets/pywal.css
+        snippets_dir = os.path.join(vpath, ".obsidian", "snippets")
+        os.makedirs(snippets_dir, exist_ok=True)
+        snippet_file = os.path.join(snippets_dir, "pywal.css")
+        with open(snippet_file, "w", encoding="utf-8") as sf:
+            sf.write(css_snippet)
+
+        # 2. Update themes/Pywal
+        theme_dir = os.path.join(vpath, ".obsidian", "themes", "Pywal")
+        os.makedirs(theme_dir, exist_ok=True)
+        with open(os.path.join(theme_dir, "manifest.json"), "w", encoding="utf-8") as mf:
+            mf.write(manifest_json)
+        with open(os.path.join(theme_dir, "theme.css"), "w", encoding="utf-8") as tf:
+            tf.write(css_snippet)
+
+        # 3. Update appearance.json
+        app_json = os.path.join(vpath, ".obsidian", "appearance.json")
+        app_data = {}
+        if os.path.exists(app_json):
+            try:
+                with open(app_json, "r", encoding="utf-8") as af:
+                    app_data = json.load(af)
+            except Exception:
+                app_data = {}
+
+        app_data["accentColor"] = accent_bright
+        app_data["interfaceFontFamily"] = "Inter"
+        app_data["textFontFamily"] = "Inter"
+        app_data["monospaceFontFamily"] = "JetBrainsMono Nerd Font"
+        app_data["nativeMenus"] = False
+        snippets = app_data.get("enabledCssSnippets", [])
+        if "pywal" not in snippets:
+            snippets.append("pywal")
+        app_data["enabledCssSnippets"] = snippets
+
+        with open(app_json, "w", encoding="utf-8") as af:
+            json.dump(app_data, af, indent=2)
+
+        # 4. Update app.json (nativeMenus: False for 0px themed HTML menus)
+        main_app_json = os.path.join(vpath, ".obsidian", "app.json")
+        main_cfg = {}
+        if os.path.exists(main_app_json):
+            try:
+                with open(main_app_json, "r", encoding="utf-8") as mf:
+                    main_cfg = json.load(mf)
+            except Exception:
+                main_cfg = {}
+        main_cfg["nativeMenus"] = False
+        with open(main_app_json, "w", encoding="utf-8") as mf:
+            json.dump(main_cfg, mf, indent=2)
+
+        print(f"Updated Obsidian vault theme: {vpath}")
+
+def update_mpv(bg_hex, fg, accent, c):
+    """Updates mpv.conf, osc.conf, and uosc.conf to match system/pywal colors."""
+    mpv_dir = os.path.expanduser("~/.config/mpv")
+    script_opts_dir = os.path.join(mpv_dir, "script-opts")
+    os.makedirs(script_opts_dir, exist_ok=True)
+
+    bg_raw = bg_hex.lstrip('#')
+    fg_raw = fg.lstrip('#')
+    acc_raw = accent.lstrip('#')
+
+    # 1. Update uosc.conf
+    uosc_conf = os.path.join(script_opts_dir, "uosc.conf")
+    uosc_content = f"""# uosc configuration - Modern, minimalist UI
+border_radius=0
+timeline_style=bar
+timeline_line_width=3
+timeline_size=12
+timeline_border=1
+timeline_cache=yes
+timeline_persistency=paused
+
+progress=always
+progress_size=3
+progress_line_width=20
+
+controls=menu,gap,subtitles,<has_many_audio>audio,<has_many_video>video,gap,space,prev,play-pause,next,space,gap,fullscreen
+controls_size=24
+controls_margin=8
+controls_spacing=4
+controls_persistency=paused
+
+volume=right
+volume_size=40
+volume_border=1
+volume_step=1
+speed_step=0.1
+
+top_bar=no-border
+top_bar_size=38
+top_bar_title=yes
+top_bar_persistency=paused
+
+menu_item_height=36
+menu_min_width=260
+menu_padding=4
+menu_type_to_search=yes
+
+font_scale=0.7
+scale=1.1
+scale_fullscreen=1.3
+animation_duration=120
+proximity_in=50
+proximity_out=140
+
+color=foreground={acc_raw},foreground_text={bg_raw},background={bg_raw},background_text={fg_raw},window_border={bg_raw},curtain={bg_raw},match={acc_raw}
+"""
+    with open(uosc_conf, "w", encoding="utf-8") as f:
+        f.write(uosc_content)
+
+    # 2. Update osc.conf (fallback)
+    osc_conf = os.path.join(script_opts_dir, "osc.conf")
+    content = f"""# MPV On-Screen Controller (OSC) Configuration
+layout=bottombar
+seekbarstyle=bar
+seekbarhandlesize=0.8
+seekrangestyle=line
+seekrangeseparate=no
+seekrangealpha=160
+boxalpha=180
+fadeduration=200
+hidetimeout=1500
+minmousemove=2
+showwindowed=yes
+showfullscreen=yes
+idlescreen=no
+timetotal=yes
+tooltipborder=1
+scalewindowed=1.3
+scalefullscreen=1.2
+
+background_color={bg_hex}
+title_color={fg}
+timecode_color={fg}
+buttons_color={fg}
+top_buttons_color={accent}
+time_pos_color={bg_hex}
+time_pos_outline_color={accent}
+held_element_color={accent}
+"""
+    with open(osc_conf, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    # 3. Update mpv.conf
+    mpv_conf = os.path.join(mpv_dir, "mpv.conf")
+    mpv_content = f"""# MPV Modern & Minimal Configuration with uosc
+osc=no
+osd-bar=no
+border=no
+
+hwdec=auto-safe
+vo=gpu-next
+gpu-context=wayland
+
+keep-open=yes
+autofit-larger=85%x85%
+cursor-autohide=1000
+cursor-autohide-fs-only=no
+
+# Subtitles styling
+sub-font="Inter"
+sub-font-size=38
+sub-color="{fg}"
+sub-border-color="{bg_hex}"
+sub-border-size=1.5
+sub-shadow-offset=0
+sub-auto=fuzzy
+
+# Screenshots
+screenshot-format=png
+screenshot-high-bit-depth=yes
+screenshot-directory=~/Pictures/Photos
+screenshot-template="mpv-shot%04n"
+"""
+    with open(mpv_conf, "w", encoding="utf-8") as f:
+        f.write(mpv_content)
+
+
+def update_lazygit(bg_hex, fg, accent, c):
+    """Updates lazygit configuration with Pywal colors and sharp block borders."""
+    lazygit_dir = os.path.expanduser("~/.config/lazygit")
+    os.makedirs(lazygit_dir, exist_ok=True)
+    cfg_file = os.path.join(lazygit_dir, "config.yml")
+
+    content = f"""# Lazygit configuration - Minimal, blocky & delta-integrated
+gui:
+  border: single
+  nerdFontsVersion: "3"
+  showIcons: true
+  showFileIcons: true
+  sidePanelWidth: 0.3333
+  theme:
+    activeBorderColor:
+      - "{accent}"
+      - bold
+    inactiveBorderColor:
+      - "{c['color1']}"
+    searchingActiveBorderColor:
+      - "{c['color6']}"
+      - bold
+    optionsTextColor:
+      - "{c['color3']}"
+    selectedLineBgColor:
+      - "{c['color1']}"
+    inactiveViewSelectedLineBgColor:
+      - bold
+    cherryPickedCommitFgColor:
+      - "{accent}"
+    cherryPickedCommitBgColor:
+      - "{bg_hex}"
+    markedBaseCommitFgColor:
+      - "{accent}"
+    markedBaseCommitBgColor:
+      - "{c['color1']}"
+    unstagedChangesColor:
+      - red
+    defaultFgColor:
+      - "{fg}"
+
+git:
+  paging:
+    colorArg: always
+    pager: delta --dark --paging=never
+"""
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def update_gdu(bg_hex, fg, accent, c, on_accent, selection_bg, selection_fg):
+    """Generates ~/.gdu.yaml with current Pywal colors and sharp styling."""
+    cfg_file = os.path.expanduser("~/.gdu.yaml")
+    content = f"""# Pywal dynamic theme for gdu (SSD/HDD disk usage analyzer)
+style:
+    header:
+        hidden: false
+        text-color: '{on_accent}'
+        background-color: '{accent}'
+    footer:
+        text-color: '{on_accent}'
+        background-color: '{accent}'
+        number-color: '{on_accent}'
+    selected-row:
+        text-color: '{selection_fg}'
+        background-color: '{selection_bg}'
+    marked:
+        text-color: '{on_accent}'
+        background-color: '{c['color3']}'
+    result-row:
+        directory-color: '{accent}'
+        number-color: '{c['color5']}'
+    progress-modal:
+        current-item-path-max-len: 0
+        show-disk-progress-bar: true
+    use-old-size-bar: false
+    show-bar-percentage: true
+
+mouse: true
+archive-browsing: false
+collapse-path: true
+no-cross: true
+ignore-dirs:
+    - /proc
+    - /dev
+    - /sys
+    - /run
+    - /tmp
+"""
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Updated gdu config: {cfg_file}")
+
+
+def update_shells():
+    """Ensures ~/.bashrc and ~/.zshrc source terminal sequences and fzf."""
+    snippet = """
+# Pywal terminal sequences & fzf theme
+if [ -f ~/.cache/wal/sequences ]; then
+    (cat ~/.cache/wal/sequences &)
+fi
+if [ -f ~/.cache/wal/colors-fzf.sh ]; then
+    source ~/.cache/wal/colors-fzf.sh
+fi
+"""
+    for rc in [os.path.expanduser("~/.bashrc"), os.path.expanduser("~/.zshrc")]:
+        if os.path.exists(rc):
+            with open(rc, "r", encoding="utf-8") as f:
+                content = f.read()
+            if "colors-fzf.sh" not in content:
+                with open(rc, "a", encoding="utf-8") as f:
+                    f.write(snippet)
+                print(f"Added pywal sequences & fzf hook to {rc}")
+
+def main():
+    if not os.path.exists(COLORS_JSON):
+        print("Colors file not found. Run wal first.")
+        return
+
+    with open(COLORS_JSON, "r", encoding="utf-8") as f:
+        wal = json.load(f)
+
+    wallpaper = wal.get("wallpaper", "")
+    if not wallpaper and os.path.exists(WAL_FILE):
+        with open(WAL_FILE, "r") as wf:
+            wallpaper = wf.read().strip()
+
+    c = wal["colors"]
+    bg_hex = wal["special"]["background"]
+    fg_hex = wal["special"]["foreground"]
+
+    is_dark = get_lum(bg_hex) < 128
+    if is_dark:
+        fg = ensure_light_hex(fg_hex, min_lum=238)
+        bg_dark = darken(bg_hex, 0.75)
+        hover_bg = lighten(bg_hex, 1.30)
+    else:
+        fg = fg_hex
+        bg_dark = darken(bg_hex, 0.90)
+        hover_bg = darken(bg_hex, 0.80)
+
+    accent = c["color4"]
+    selection_bg = c["color1"]
+    selection_fg = "#121212" if get_lum(selection_bg) >= 110 else "#ffffff"
+    on_accent = "#121212" if get_lum(accent) >= 120 else "#ffffff"
+    surface = lighten(bg_hex, 1.20) if is_dark else darken(bg_hex, 0.85)
+
+    update_gtk(bg_hex, fg, accent, selection_bg, selection_fg, bg_dark, hover_bg)
+    update_fzf(bg_hex, fg, c, bg_dark)
+    update_tmux(bg_hex, fg, accent, c, bg_dark, on_accent, surface)
+    if wallpaper:
+        update_swaylock(wallpaper, bg_hex, fg, accent, c)
+        update_sddm(wallpaper, bg_hex, fg, accent, c, bg_dark, on_accent)
+    update_swaynag(bg_hex, fg, accent, c, bg_dark, is_dark)
+    update_obsidian(bg_hex, fg, accent, c, bg_dark, is_dark)
+    update_mpv(bg_hex, fg, accent, c)
+    update_lazygit(bg_hex, fg, accent, c)
+    update_gdu(bg_hex, fg, accent, c, on_accent, selection_bg, selection_fg)
+    update_shells()
+
+if __name__ == "__main__":
+    main()

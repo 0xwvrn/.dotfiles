@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# wifi: Fast, minimal terminal TUI for NetworkManager using fzf
+
+set -e
+
+if [ -f "$HOME/.cache/wal/colors-fzf.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.cache/wal/colors-fzf.sh"
+fi
+
+if ! command -v fzf >/dev/null 2>&1; then
+    echo "Error: fzf is required for this script." >&2
+    exit 1
+fi
+
+get_networks() {
+    nmcli --terse --fields "IN-USE,SSID,SECURITY,BARS,SIGNAL" device wifi list --rescan no 2>/dev/null | awk -F: '
+    NF >= 4 && $2 != "" {
+        in_use = ($1 == "*") ? "✓" : " ";
+        sec = ($3 != "" && $3 != "--") ? "󰌾" : " ";
+        printf "%-2s %-2s  │ %-28s │ %s (%s%%)\n", in_use, sec, $2, $4, $5
+    }' | sort -u
+}
+
+rescan_wifi() {
+    nmcli device wifi rescan 2>/dev/null || true
+    sleep 0.5
+}
+
+while true; do
+    wifi_state=$(nmcli -fields WIFI g 2>/dev/null | tail -n 1 | tr -d ' ')
+    if [ "$wifi_state" = "disabled" ]; then
+        toggle_opt="󰤨  [Toggle Wi-Fi: Turn ON]"
+        chosen=$(printf "%s\n" "$toggle_opt" | fzf \
+            --ansi \
+            --header="Wi-Fi is currently disabled" \
+            --prompt="Wi-Fi > " \
+            --layout=reverse \
+            --height=30% \
+            --border)
+        if [ "$chosen" = "$toggle_opt" ]; then
+            nmcli radio wifi on
+            rescan_wifi
+            continue
+        fi
+        exit 0
+    fi
+
+    refresh_opt="󰑐  [↻] Refresh / Rescan Networks"
+    toggle_opt="󰤮  [Toggle Wi-Fi: Turn OFF]"
+    networks=$(get_networks)
+
+    if [ -n "$networks" ]; then
+        menu_items=$(printf "%s\n%s\n%s" "$refresh_opt" "$toggle_opt" "$networks")
+    else
+        menu_items=$(printf "%s\n%s\n%s" "$refresh_opt" "$toggle_opt" "   No networks found")
+    fi
+
+    # Run fzf with instant ctrl-r support
+    fzf_output=$(printf "%s\n" "$menu_items" | fzf \
+        --ansi \
+        --expect=ctrl-r \
+        --header="Enter: Connect / Select | ctrl-r: Refresh | ESC: Cancel" \
+        --prompt="Wi-Fi > " \
+        --layout=reverse \
+        --height=45% \
+        --border) || true
+
+    key=$(echo "$fzf_output" | head -n 1)
+    chosen=$(echo "$fzf_output" | sed 1d)
+
+    # Handle ctrl-r keypress or selecting the Refresh item
+    if [ "$key" = "ctrl-r" ] || [ "$chosen" = "$refresh_opt" ]; then
+        rescan_wifi
+        continue
+    fi
+
+    # Handle exit / cancel
+    if [ -z "$chosen" ]; then
+        exit 0
+    fi
+
+    # Handle toggle off
+    if [ "$chosen" = "$toggle_opt" ]; then
+        nmcli radio wifi off
+        echo "Wi-Fi turned off."
+        exit 0
+    fi
+
+    if [ "$chosen" = "   No networks found" ]; then
+        continue
+    fi
+
+    # Extract SSID safely from the second column
+    ssid=$(echo "$chosen" | awk -F '│' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
+
+    if [ -z "$ssid" ]; then
+        continue
+    fi
+
+    # If already connected, offer options
+    if echo "$chosen" | grep -q "^✓"; then
+        action=$(printf "%s\n%s\n%s" "Disconnect" "Reconnect" "Cancel" | fzf \
+            --ansi \
+            --header="Connected to: $ssid" \
+            --prompt="$ssid > " \
+            --layout=reverse \
+            --height=25% \
+            --border) || true
+        case "$action" in
+            "Disconnect")
+                echo "Disconnecting from $ssid..."
+                nmcli connection down id "$ssid" 2>/dev/null || nmcli device disconnect wlan0 2>/dev/null || true
+                continue
+                ;;
+            "Reconnect")
+                echo "Reconnecting to $ssid..."
+                nmcli connection up id "$ssid"
+                exit 0
+                ;;
+            *)
+                continue
+                ;;
+        esac
+    fi
+
+    # Connect to network
+    if nmcli connection show | grep -Fq "$ssid"; then
+        echo "Connecting to saved network: $ssid..."
+        if nmcli connection up id "$ssid"; then
+            echo "Connected to $ssid."
+            exit 0
+        else
+            echo "Failed to connect to $ssid."
+            read -rp "Press Enter to return to menu..." _
+            continue
+        fi
+    else
+        sec=$(nmcli -t -f SSID,SECURITY dev wifi list | grep "^${ssid}:" | cut -d: -f2 | head -n 1 || true)
+        if [ -n "$sec" ] && [ "$sec" != "--" ]; then
+            read -rsp "Enter password for $ssid: " pass
+            echo ""
+            [ -z "$pass" ] && continue
+            echo "Connecting to $ssid..."
+            if nmcli device wifi connect "$ssid" password "$pass"; then
+                echo "Connected to $ssid."
+                exit 0
+            else
+                echo "Failed to connect to $ssid (incorrect password or timeout)."
+                read -rp "Press Enter to return to menu..." _
+                continue
+            fi
+        else
+            echo "Connecting to open network: $ssid..."
+            if nmcli device wifi connect "$ssid"; then
+                echo "Connected to $ssid."
+                exit 0
+            else
+                echo "Failed to connect to $ssid."
+                read -rp "Press Enter to return to menu..." _
+                continue
+            fi
+        fi
+    fi
+done

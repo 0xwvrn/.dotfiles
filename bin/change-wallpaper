@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# change-wallpaper: Change wallpaper and dynamically update interface colors across Sway, Waybar, Kitty, Rofi, and Dunst.
+
+set -e
+
+WALLPAPER_DIR="${HOME}/wallpaper"
+CURRENT_WAL_FILE="${HOME}/.cache/wal/wal"
+
+# Ensure SWAYSOCK is available
+if [ -z "$SWAYSOCK" ]; then
+    FOUND_SOCK=$(ls /run/user/"$(id -u)"/sway-ipc.*.sock 2>/dev/null | head -n 1 || true)
+    if [ -n "$FOUND_SOCK" ]; then
+        export SWAYSOCK="$FOUND_SOCK"
+    fi
+fi
+
+usage() {
+    echo "Usage: $(basename "$0") [OPTIONS] [IMAGE_PATH]"
+    echo ""
+    echo "Options:"
+    echo "  -r, --random       Pick a random wallpaper from ${WALLPAPER_DIR}"
+    echo "  -s, --select       Select a wallpaper using rofi menu"
+    echo "  --restore          Restore the last set wallpaper & colorscheme"
+    echo "  -h, --help         Show this help message"
+    echo ""
+    echo "If no arguments are provided, the interactive rofi selector is opened."
+}
+
+select_with_rofi() {
+    if ! command -v rofi >/dev/null 2>&1; then
+        echo "Error: rofi is not installed." >&2
+        exit 1
+    fi
+
+    if [ ! -d "$WALLPAPER_DIR" ]; then
+        echo "Error: Directory ${WALLPAPER_DIR} does not exist." >&2
+        exit 1
+    fi
+
+    # List image files in wallpaper directory
+    chosen=$(find "$WALLPAPER_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) -printf "%f\n" | sort | rofi -dmenu -i -p "󰸉 Select Wallpaper")
+
+    if [ -n "$chosen" ]; then
+        echo "${WALLPAPER_DIR}/${chosen}"
+    fi
+}
+
+pick_random() {
+    if [ ! -d "$WALLPAPER_DIR" ]; then
+        echo "Error: Directory ${WALLPAPER_DIR} does not exist." >&2
+        exit 1
+    fi
+    find "$WALLPAPER_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | shuf -n 1
+}
+
+TARGET_IMAGE=""
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    -r|--random)
+        TARGET_IMAGE=$(pick_random)
+        ;;
+    -s|--select)
+        TARGET_IMAGE=$(select_with_rofi)
+        ;;
+    --restore)
+        IS_RESTORE="true"
+        if [ -f "$CURRENT_WAL_FILE" ]; then
+            TARGET_IMAGE=$(cat "$CURRENT_WAL_FILE")
+        else
+            TARGET_IMAGE=$(pick_random)
+        fi
+        ;;
+    "")
+        # Default with no arguments: open interactive picker
+        TARGET_IMAGE=$(select_with_rofi)
+        ;;
+    *)
+        TARGET_IMAGE="$1"
+        ;;
+esac
+
+# If user cancelled selection or empty
+if [ -z "$TARGET_IMAGE" ]; then
+    exit 0
+fi
+
+# Expand path if relative or ~
+TARGET_IMAGE=$(realpath "$TARGET_IMAGE")
+
+if [ ! -f "$TARGET_IMAGE" ]; then
+    echo "Error: Image not found: $TARGET_IMAGE" >&2
+    exit 1
+fi
+
+echo "==> Applying wallpaper and generating theme from: $TARGET_IMAGE"
+
+# 1. Generate colors with pywal (-n prevents pywal from attempting to set X11 root window)
+# Filter out ImageMagick 7 convert deprecation warning
+wal -i "$TARGET_IMAGE" -n 2>&1 | grep -v "WARNING: The convert command is deprecated" || true
+
+# 2. Update Sway wallpaper and window border colors dynamically
+if command -v swaymsg >/dev/null 2>&1; then
+    swaymsg "output * bg '$TARGET_IMAGE' fill" 2>/dev/null || true
+    # Apply new pywal client window colors directly without reloading Sway
+    if [ -f "${HOME}/.cache/wal/colors.json" ]; then
+        python3 -c "
+import json, os, subprocess
+colors_path = os.path.expanduser('~/.cache/wal/colors.json')
+with open(colors_path) as f:
+    w = json.load(f)
+bg = w['special']['background']
+fg = w['special']['foreground']
+c1 = w['colors']['color1']
+subprocess.run(['swaymsg', f'client.focused {bg} {bg} {fg} {bg} {bg}'], check=False)
+subprocess.run(['swaymsg', f'client.focused_inactive {bg} {bg} {fg} {bg} {bg}'], check=False)
+subprocess.run(['swaymsg', f'client.unfocused {bg} {bg} {fg} {bg} {bg}'], check=False)
+subprocess.run(['swaymsg', f'client.urgent {c1} {c1} {fg} {c1} {c1}'], check=False)
+subprocess.run(['swaymsg', f'client.placeholder {bg} {bg} {fg} {bg} {bg}'], check=False)
+" 2>/dev/null || true
+    fi
+fi
+
+# 3. Reload or ensure Waybar is running
+if pgrep -x waybar >/dev/null 2>&1; then
+    pkill -SIGUSR2 waybar 2>/dev/null || true
+else
+    # If waybar was not running, reload sway bar to bring it up
+    if command -v swaymsg >/dev/null 2>&1; then
+        swaymsg reload 2>/dev/null || true
+    fi
+fi
+
+# 4. Signal Kitty to reload colors
+if pgrep -x kitty >/dev/null 2>&1; then
+    pkill -SIGUSR1 kitty 2>/dev/null || true
+fi
+
+# 5. Reload Dunst notifications
+if command -v dunstctl >/dev/null 2>&1; then
+    dunstctl reload 2>/dev/null || true
+elif pgrep -x dunst >/dev/null 2>&1; then
+    killall dunst 2>/dev/null || true
+    dunst &
+fi
+
+# 6. Update IDE themes (Antigravity IDE, Code - OSS, VS Code)
+if [ -x "${HOME}/.local/bin/wal-ide" ]; then
+    "${HOME}/.local/bin/wal-ide" || true
+fi
+
+# 7. Update KDE & Dolphin themes
+if [ -x "${HOME}/.local/bin/wal-kde" ]; then
+    "${HOME}/.local/bin/wal-kde" || true
+fi
+
+# 8. Update Zen Browser theme
+if [ -x "${HOME}/.local/bin/wal-zen" ]; then
+    "${HOME}/.local/bin/wal-zen" || true
+fi
+
+# 9. Update Extra apps (GTK 3/4, fzf, tmux, swaylock, Obsidian, Shells)
+if [ -x "${HOME}/.local/bin/wal-extra" ]; then
+    "${HOME}/.local/bin/wal-extra" || true
+fi
+
+# 9. Sync system dark/light preference for Electron/Web apps (Antigravity, Zen Browser)
+python3 -c "
+import json, os, subprocess
+colors_file = os.path.expanduser('~/.cache/wal/colors.json')
+if os.path.exists(colors_file):
+    with open(colors_file) as f: wal = json.load(f)
+    bg = wal['special']['background'].lstrip('#')
+    lum = 0.299 * int(bg[0:2], 16) + 0.587 * int(bg[2:4], 16) + 0.114 * int(bg[4:6], 16)
+    mode = 'prefer-dark' if lum < 128 else 'prefer-light'
+    subprocess.run(['gsettings', 'set', 'org.gnome.desktop.interface', 'color-scheme', mode], stderr=subprocess.DEVNULL, check=False)
+" 2>/dev/null || true
+
+# 9. Notify user
+if command -v notify-send >/dev/null 2>&1; then
+    notify-send -i "$TARGET_IMAGE" "Theme Updated" "Active wallpaper: $(basename "$TARGET_IMAGE")" 2>/dev/null || true
+fi
+
+echo "==> Done!"
