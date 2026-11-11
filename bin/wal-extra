@@ -1169,18 +1169,31 @@ ignore-dirs:
 
 
 def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
-    """Updates Discord and Vesktop (Vencord QuickCSS) with Pywal colors and sharp styling."""
-    vencord_css = os.path.expanduser("~/.config/Vencord/settings/quickCss.css")
-    vesktop_css = os.path.expanduser("~/.config/vesktop/settings/quickCss.css")
+    """Updates Discord and Vesktop (Vencord QuickCSS & Theme) with Pywal colors and sharp styling."""
+    targets = [
+        os.path.expanduser("~/.config/Vencord/settings/quickCss.css"),
+        os.path.expanduser("~/.config/Vencord/themes/pywal-vencord.theme.css"),
+        os.path.expanduser("~/.config/vesktop/settings/quickCss.css"),
+        os.path.expanduser("~/.config/vesktop/themes/pywal-vencord.theme.css"),
+    ]
 
     bg_darker = darken(bg_hex, 0.55)
+    bg_darkest = darken(bg_hex, 0.40)
     accent_dark = darken(accent, 0.80)
     color8 = c.get("color8", "#99908a")
     color6 = c.get("color6", "#c4b499")
+    color1 = c.get("color1", "#818375")
 
-    css = f"""/* Pywal Dynamic Theme for Discord & Vesktop (Vencord QuickCSS) */
-:root {{
+    css = f"""/**
+ * @name Pywal for Vencord
+ * @author wvrn
+ * @version 2.0.0
+ * @description Dynamic Pywal Theme for Discord & Vesktop
+ */
+
+:root, .theme-dark, .theme-light {{
     --brand-experiment: {accent} !important;
+    --brand-experiment-360: {accent} !important;
     --brand-experiment-500: {accent} !important;
     --brand-experiment-560: {accent_dark} !important;
     --brand-experiment-600: {accent_dark} !important;
@@ -1189,7 +1202,7 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
     --background-primary: {bg_hex} !important;
     --background-secondary: {bg_dark} !important;
     --background-secondary-alt: {bg_darker} !important;
-    --background-tertiary: {bg_darker} !important;
+    --background-tertiary: {bg_darkest} !important;
     --background-floating: {bg_dark} !important;
     --background-accent: {accent} !important;
     --background-modifier-hover: {hover_bg} !important;
@@ -1197,6 +1210,24 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
     --background-modifier-selected: {accent}44 !important;
     --channeltextarea-background: {bg_dark} !important;
     --input-background: {bg_dark} !important;
+
+    /* Modern Discord Base & Surface Variables */
+    --bg-base-primary: {bg_hex} !important;
+    --bg-base-secondary: {bg_dark} !important;
+    --bg-base-tertiary: {bg_darkest} !important;
+    --bg-overlay-1: {bg_hex} !important;
+    --bg-overlay-2: {bg_dark} !important;
+    --bg-overlay-3: {bg_darker} !important;
+    --bg-overlay-app-frame: {bg_hex} !important;
+    --background-base-lowest: {bg_darkest} !important;
+    --background-base-lower: {bg_darker} !important;
+    --background-base-low: {bg_dark} !important;
+    --background-surface-high: {bg_dark} !important;
+    --background-surface-higher: {bg_darker} !important;
+    --background-surface-highest: {bg_darkest} !important;
+    --chat-background-default: {bg_hex} !important;
+    --__header-bar-background: {bg_hex} !important;
+    --custom-channel-members-bg: {bg_dark} !important;
 
     /* Text */
     --text-normal: {fg} !important;
@@ -1209,9 +1240,9 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
     --interactive-muted: {color8} !important;
 
     /* Scrollbars */
-    --scrollbar-auto-thumb: {accent}66 !important;
+    --scrollbar-auto-thumb: {accent} !important;
     --scrollbar-auto-track: transparent !important;
-    --scrollbar-thin-thumb: {accent}66 !important;
+    --scrollbar-thin-thumb: {accent} !important;
 
     /* Sharp aesthetic */
     --radius-xs: 0px !important;
@@ -1234,9 +1265,15 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
     font-family: "Hack", monospace !important;
 }}
 
-/* Unread badges and notification pills */
+/* Unread & Notification Badges */
 [class*="unread_"] {{
     background-color: {accent} !important;
+    border-radius: 0px !important;
+}}
+
+[class*="numberBadge_"], [class*="badge_"] {{
+    background-color: {accent} !important;
+    color: #121212 !important;
     border-radius: 0px !important;
 }}
 
@@ -1273,7 +1310,7 @@ button {{
     border-radius: 0px !important;
 }}
 """
-    for target in [vencord_css, vesktop_css]:
+    for target in targets:
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as f:
             f.write(css)
