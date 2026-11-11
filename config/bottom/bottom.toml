@@ -1,0 +1,30 @@
+# Bottom (btm) Minimal Sharp Config for Arch + Sway
+
+[flags]
+# Update interval
+rate = "1s"
+# Use plain sharp rectangular borders (no rounded curves)
+border_type = "plain"
+# Default to process widget focused
+default_widget_type = "proc"
+# Disable discrete GPU widget
+disable_gpu = true
+# Hide battery (already in waybar)
+battery = false
+
+[network_graph]
+use_bytes = true
+
+[styles.widgets]
+border_color = "gray"
+selected_border_color = "white"
+widget_title = { color = "white", bold = true }
+text = { color = "gray" }
+selected_text = { color = "black", bg_color = "white" }
+
+[styles.tables]
+headers = { color = "white", bold = true }
+
+[styles.graphs]
+graph_color = "gray"
+legend_text = { color = "gray" }
