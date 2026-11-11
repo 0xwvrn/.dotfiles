@@ -246,45 +246,6 @@ set -g mode-style "bg={accent},fg={on_accent},bold"
     except Exception:
         pass
 
-def render_swaylock_battery_image(wallpaper_path, bg, fg, accent):
-    """Renders wallpaper with sharp 0px rectangular battery badge in top right."""
-    cap = ""
-    stat = ""
-    try:
-        with open("/sys/class/power_supply/BAT0/capacity") as f:
-            cap = f.read().strip() + "%"
-        with open("/sys/class/power_supply/BAT0/status") as f:
-            s = f.read().strip()
-            if s == "Charging":
-                stat = " ⚡"
-    except Exception:
-        pass
-
-    if not cap:
-        return wallpaper_path
-
-    out_path = "/tmp/swaylock-battery.png"
-    font_path = os.path.expanduser("~/.local/share/fonts/Inter/Inter-Bold.ttf")
-    if not os.path.exists(font_path):
-        font_path = os.path.expanduser("~/.local/share/fonts/JetBrains-Mono-Nerd-Font-Complete.ttf")
-
-    text = f"{cap}{stat}"
-    cmd = [
-        "magick", wallpaper_path,
-        "-gravity", "NorthEast",
-        "-fill", bg, "-stroke", accent, "-strokewidth", "1",
-        "-draw", "rectangle 40,40 170,74",
-        "-fill", fg, "-stroke", "none",
-        "-font", font_path, "-pointsize", "14",
-        "-draw", f"text 65,48 \"{text}\"",
-        out_path
-    ]
-    try:
-        subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
-        return out_path
-    except Exception:
-        return wallpaper_path
-
 def update_swaylock(wallpaper_path, bg, fg, accent, c):
     """Generates ~/.config/swaylock/config matching current wallpaper."""
     swaylock_dir = os.path.expanduser("~/.config/swaylock")
@@ -299,7 +260,7 @@ def update_swaylock(wallpaper_path, bg, fg, accent, c):
         except Exception:
             pass
 
-    lock_img = render_swaylock_battery_image(wallpaper_path, bg, fg, accent)
+    lock_img = wallpaper_path
 
     bg_clean = bg.lstrip('#')
     fg_clean = fg.lstrip('#')
