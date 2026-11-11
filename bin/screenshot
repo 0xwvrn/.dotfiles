@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# ~/.local/bin/screenshot: Minimal, instantaneous screenshot utility for Sway
+# Supports full screen capture and interactive rectangle crop with slurp.
+
+DIR="${HOME}/Pictures/Screenshots"
+mkdir -p "$DIR"
+FILE="${DIR}/Screenshot_$(date +'%Y%m%d_%H%M%S').png"
+
+case "$1" in
+    --area)
+        # Select rectangular area with slurp
+        GEOM=$(slurp -b 00000088 -c ADADAC -s 00000000 -w 1 2>/dev/null)
+        if [ -n "$GEOM" ]; then
+            grim -g "$GEOM" "$FILE"
+            if command -v wl-copy >/dev/null 2>&1; then
+                wl-copy < "$FILE"
+            fi
+            notify-send -t 2000 -a "Screenshot" "Area Snapshot Saved" "$(basename "$FILE")\nSaved to ~/Pictures/Screenshots"
+        fi
+        ;;
+    --full|*)
+        grim "$FILE"
+        if command -v wl-copy >/dev/null 2>&1; then
+            wl-copy < "$FILE"
+        fi
+        notify-send -t 2000 -a "Screenshot" "Full Screen Saved" "$(basename "$FILE")\nSaved to ~/Pictures/Screenshots"
+        ;;
+esac

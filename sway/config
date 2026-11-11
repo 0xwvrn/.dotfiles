@@ -34,31 +34,26 @@ output * bg $wallpaper fill
 # You can get the names of your outputs by running: swaymsg -t get_outputs
 
 ### Idle configuration
-#
-# Example configuration:
-#
-# exec swayidle -w \
-#          timeout 300 'swaylock -f -c 000000' \
-#          timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
-#          before-sleep 'swaylock -f -c 000000'
-#
-# This will lock your screen after 300 seconds of inactivity, then turn off
-# your displays after another 300 seconds, and turn your screens back on when
-# resumed. It will also lock your screen before your computer goes to sleep.
+# Lock after 10 mins (600s), turn off display after 15 mins (900s), lock before sleep
+exec swayidle -w \
+    timeout 600 'swaylock -f' \
+    timeout 900 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+    before-sleep 'swaylock -f'
+
+# Lock screen when closing laptop lid
+bindswitch lid:on exec swaylock -f
 
 ### Input configuration
-#
-# Example configuration:
-#
-#   input "2:14:SynPS/2_Synaptics_TouchPad" {
-#       dwt enabled
-#       tap enabled
-#       natural_scroll enabled
-#       middle_emulation enabled
-#   }
-#
-# You can get the names of your inputs by running: swaymsg -t get_inputs
-# Read `man 5 sway-input` for more information about this section.
+input "type:touchpad" {
+    dwt enabled
+    tap enabled
+    natural_scroll enabled
+    middle_emulation enabled
+}
+
+# Smooth 3-finger workspace swipe gestures
+bindgesture swipe:3:right workspace prev
+bindgesture swipe:3:left workspace next
 
 ### Key bindings
 #
@@ -233,8 +228,13 @@ bindsym $mod+r mode "resize"
     # Special keys to adjust brightness via brightnessctl
     bindsym --locked XF86MonBrightnessDown exec brightnessctl set 5%-
     bindsym --locked XF86MonBrightnessUp exec brightnessctl set 5%+
-    # Special key to take a screenshot with grim
-    bindsym Print exec grim
+    # Screenshots (fullscreen & interactive crop selection)
+    bindsym Print exec ~/.local/bin/screenshot --full
+    bindsym Shift+Print exec ~/.local/bin/screenshot --area
+    bindsym $mod+Print exec ~/.local/bin/screenshot --area
+
+    # Searchable clipboard history
+    bindsym $mod+c exec ~/.local/bin/clipboard-menu
 
     # Wallpaper & dynamic color switcher
     bindsym $mod+Shift+w exec ~/.local/bin/change-wallpaper --select
@@ -260,6 +260,10 @@ exec ~/.local/bin/change-wallpaper --restore
 
 # Automated workspace setup on login
 exec ~/.local/bin/sway-startup
+
+# Clipboard history watcher (if wl-clipboard and cliphist are installed)
+exec which cliphist >/dev/null 2>&1 && wl-paste --watch cliphist store
+exec which cliphist >/dev/null 2>&1 && wl-paste --type image --watch cliphist store
 
 # Status Bar:
 #

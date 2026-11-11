@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# ~/.local/bin/clipboard-menu: Searchable clipboard history picker for Sway
+
+if ! command -v cliphist >/dev/null 2>&1 || ! command -v wl-paste >/dev/null 2>&1; then
+    notify-send -t 3500 "Clipboard History" "Install wl-clipboard & cliphist to enable history:\nsudo pacman -S wl-clipboard cliphist"
+    exit 0
+fi
+
+selected=$(cliphist list | rofi -dmenu -p "Clipboard" -theme-str 'window {width: 45%;}' -theme-str 'listview {lines: 10;}')
+if [ -n "$selected" ]; then
+    echo "$selected" | cliphist decode | wl-copy
+    notify-send -t 1500 "Clipboard" "Copied to clipboard"
+fi
