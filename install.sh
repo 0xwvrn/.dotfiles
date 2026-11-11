@@ -95,7 +95,8 @@ install_packages() {
 deploy_dotfiles() {
     echo -e "\n${C_BOLD}=== Step 2: Deploying Configurations ===${C_RESET}"
     
-    mkdir -p "${HOME}/.config" "${HOME}/.local/bin" "${HOME}/wallpaper"
+    mkdir -p "${HOME}/.config" "${HOME}/.local/bin" "${HOME}/Pictures/wallpaper"
+    [ ! -e "${HOME}/wallpaper" ] && ln -s "${HOME}/Pictures/wallpaper" "${HOME}/wallpaper" || true
 
     local mode="symlink"
     read -r -p "Deploy method: [S]ymlink (recommended) or [C]opy? [S/c] " choice
@@ -154,8 +155,8 @@ deploy_dotfiles() {
 
     # Deploy wallpapers
     if [ -d "${DOTFILES_DIR}/wallpapers" ] && [ -n "$(ls -A "${DOTFILES_DIR}/wallpapers" 2>/dev/null)" ]; then
-        cp -rn "${DOTFILES_DIR}/wallpapers"/* "${HOME}/wallpaper/" 2>/dev/null || true
-        success "Wallpapers installed to ~/wallpaper"
+        cp -rn "${DOTFILES_DIR}/wallpapers"/* "${HOME}/Pictures/wallpaper/" 2>/dev/null || true
+        success "Wallpapers installed to ~/Pictures/wallpaper"
     fi
 
     # Deploy root dotfiles

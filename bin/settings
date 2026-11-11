@@ -250,7 +250,7 @@ manage_wallpaper() {
         local choice
         choice=$(printf "%s\n%s\n%s\n%s" \
             "󰸉  Select Wallpaper (Interactive Picker)" \
-            "  Random Wallpaper from ~/wallpaper" \
+            "  Random Wallpaper from ~/Pictures/wallpaper" \
             "󰁯  Restore Last Wallpaper" \
             "󰌍  Back to Settings" | \
             fzf_menu "Wallpaper" "Active Wallpaper: $cur_w")

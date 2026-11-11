@@ -3,7 +3,10 @@
 
 set -e
 
-WALLPAPER_DIR="${HOME}/wallpaper"
+WALLPAPER_DIR="${HOME}/Pictures/wallpaper"
+if [ ! -d "$WALLPAPER_DIR" ] && [ -d "${HOME}/wallpaper" ]; then
+    WALLPAPER_DIR="${HOME}/wallpaper"
+fi
 CURRENT_WAL_FILE="${HOME}/.cache/wal/wal"
 
 # Ensure SWAYSOCK is available
