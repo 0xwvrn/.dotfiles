@@ -1168,6 +1168,118 @@ ignore-dirs:
     print(f"Updated gdu config: {cfg_file}")
 
 
+def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
+    """Updates Discord and Vesktop (Vencord QuickCSS) with Pywal colors and sharp styling."""
+    vencord_css = os.path.expanduser("~/.config/Vencord/settings/quickCss.css")
+    vesktop_css = os.path.expanduser("~/.config/vesktop/settings/quickCss.css")
+
+    bg_darker = darken(bg_hex, 0.55)
+    accent_dark = darken(accent, 0.80)
+    color8 = c.get("color8", "#99908a")
+    color6 = c.get("color6", "#c4b499")
+
+    css = f"""/* Pywal Dynamic Theme for Discord & Vesktop (Vencord QuickCSS) */
+:root {{
+    --brand-experiment: {accent} !important;
+    --brand-experiment-500: {accent} !important;
+    --brand-experiment-560: {accent_dark} !important;
+    --brand-experiment-600: {accent_dark} !important;
+
+    /* Backgrounds */
+    --background-primary: {bg_hex} !important;
+    --background-secondary: {bg_dark} !important;
+    --background-secondary-alt: {bg_darker} !important;
+    --background-tertiary: {bg_darker} !important;
+    --background-floating: {bg_dark} !important;
+    --background-accent: {accent} !important;
+    --background-modifier-hover: {hover_bg} !important;
+    --background-modifier-active: {accent}33 !important;
+    --background-modifier-selected: {accent}44 !important;
+    --channeltextarea-background: {bg_dark} !important;
+    --input-background: {bg_dark} !important;
+
+    /* Text */
+    --text-normal: {fg} !important;
+    --text-muted: {color8} !important;
+    --header-primary: {fg} !important;
+    --header-secondary: {color6} !important;
+    --interactive-normal: {fg}aa !important;
+    --interactive-hover: {fg} !important;
+    --interactive-active: {accent} !important;
+    --interactive-muted: {color8} !important;
+
+    /* Scrollbars */
+    --scrollbar-auto-thumb: {accent}66 !important;
+    --scrollbar-auto-track: transparent !important;
+    --scrollbar-thin-thumb: {accent}66 !important;
+
+    /* Sharp aesthetic */
+    --radius-xs: 0px !important;
+    --radius-sm: 0px !important;
+    --radius-md: 0px !important;
+    --radius-lg: 0px !important;
+    --radius-xl: 0px !important;
+    --radius-full: 0px !important;
+    --radius-round: 0px !important;
+
+    /* Monospace font */
+    --font-primary: "Hack", monospace !important;
+    --font-display: "Hack", monospace !important;
+    --font-code: "Hack", monospace !important;
+}}
+
+/* Global resets for consistent look */
+* {{
+    border-radius: 0px !important;
+    font-family: "Hack", monospace !important;
+}}
+
+/* Unread badges and notification pills */
+[class*="unread_"] {{
+    background-color: {accent} !important;
+    border-radius: 0px !important;
+}}
+
+[class*="item_"][style*="height"] {{
+    border-radius: 0px !important;
+    background-color: {accent} !important;
+}}
+
+/* Active channel highlight */
+[class*="modeSelected_"] [class*="link_"] {{
+    background-color: {bg_dark} !important;
+    border-left: 2px solid {accent} !important;
+}}
+
+/* Mention tags */
+[class*="mentioned_"] {{
+    background-color: {accent}1a !important;
+}}
+[class*="mentioned_"]::before {{
+    background-color: {accent} !important;
+    border-radius: 0px !important;
+}}
+
+/* Avatars & Server Icons: 0px sharp blocks */
+[class*="avatar_"], [class*="wrapper_"] foreignObject, [class*="mask_"] foreignObject,
+[class*="guildIcon_"], [class*="icon_"], [class*="childWrapper_"] {{
+    border-radius: 0px !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}}
+
+/* Buttons */
+button {{
+    border-radius: 0px !important;
+}}
+"""
+    for target in [vencord_css, vesktop_css]:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(css)
+        print(f"Updated Discord/Vesktop theme: {target}")
+
+
 def update_shells():
     """Ensures ~/.bashrc and ~/.zshrc source terminal sequences and fzf."""
     snippet = """
@@ -1232,6 +1344,7 @@ def main():
     update_mpv(bg_hex, fg, accent, c)
     update_lazygit(bg_hex, fg, accent, c)
     update_gdu(bg_hex, fg, accent, c, on_accent, selection_bg, selection_fg)
+    update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg)
     update_shells()
 
 if __name__ == "__main__":
