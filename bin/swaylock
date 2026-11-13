@@ -15,36 +15,73 @@ try:
         wallpaper = f.read().strip()
     with open(colors_file) as f:
         data = json.load(f)
-        bg = data["special"]["background"]
-        fg = data["special"]["foreground"]
-        accent = data["colors"]["color4"]
+        bg = data.get("special", {}).get("background", "#0d0c09")
+        fg = data.get("special", {}).get("foreground", "#d3d0bd")
+        accent = data.get("colors", {}).get("color4", "#7E8273")
 
     cap = ""
     stat = ""
-    try:
-        with open("/sys/class/power_supply/BAT0/capacity") as f:
-            cap = f.read().strip() + "%"
-        with open("/sys/class/power_supply/BAT0/status") as f:
-            s = f.read().strip()
-            if s == "Charging":
-                stat = " ⚡"
-    except Exception:
-        pass
+    for bat in ["BAT0", "BAT1"]:
+        bat_path = f"/sys/class/power_supply/{bat}"
+        if os.path.exists(bat_path):
+            try:
+                with open(f"{bat_path}/capacity") as f:
+                    cap = int(f.read().strip())
+                with open(f"{bat_path}/status") as f:
+                    stat = f.read().strip()
+                break
+            except Exception:
+                pass
 
-    if cap:
-        out_path = "/tmp/swaylock-battery.png"
-        font_path = os.path.expanduser("~/.local/share/fonts/Inter/Inter-Bold.ttf")
+    if cap != "" and os.path.exists(wallpaper):
+        # Battery icon selection
+        if stat == "Charging":
+            icon = "󰂄"
+        else:
+            icons = [
+                (90, "󰁹"), (80, "󰂂"), (70, "󰂁"), (60, "󰂀"), (50, "󰁿"),
+                (40, "󰁾"), (30, "󰁽"), (20, "󰁼"), (10, "󰁻"), (0, "󰂃")
+            ]
+            icon = "󰁹"
+            for threshold, ico in icons:
+                if cap >= threshold:
+                    icon = ico
+                    break
+
+        text = f"{icon}  {cap}%"
+
+        font_path = "/usr/share/fonts/TTF/RobotoMonoNerdFont-Bold.ttf"
+        if not os.path.exists(font_path):
+            font_path = "/usr/share/fonts/TTF/SymbolsNerdFont-Regular.ttf"
         if not os.path.exists(font_path):
             font_path = os.path.expanduser("~/.local/share/fonts/JetBrains-Mono-Nerd-Font-Complete.ttf")
-        text = f"{cap}{stat}"
+
+        # Compute dynamic scale relative to 768p screen height
+        res = subprocess.run(["magick", "identify", "-format", "%w %h", wallpaper], capture_output=True, text=True, check=True)
+        img_w, img_h = map(int, res.stdout.strip().split())
+        scale = max(1.0, img_h / 768.0)
+
+        badge_w = int(185 * scale)
+        badge_h = int(52 * scale)
+        pointsize = int(24 * scale)
+        margin_x = int(28 * scale)
+        margin_y = int(28 * scale)
+        stroke_w = max(1, int(1.5 * scale))
+
+        out_path = "/tmp/swaylock-battery.png"
         subprocess.run([
             "magick", wallpaper,
-            "-gravity", "NorthEast",
-            "-fill", bg, "-stroke", accent, "-strokewidth", "1",
-            "-draw", "rectangle 40,40 170,74",
-            "-fill", fg, "-stroke", "none",
-            "-font", font_path, "-pointsize", "14",
-            "-draw", f"text 65,48 \"{text}\"",
+            "(",
+                "-size", f"{badge_w}x{badge_h}", f"xc:{bg}",
+                "-stroke", accent, "-strokewidth", str(stroke_w),
+                "-draw", f"rectangle 0,0 {badge_w-1},{badge_h-1}",
+                "-font", font_path, "-pointsize", str(pointsize),
+                "-fill", fg, "-stroke", "none",
+                "-gravity", "center", "-annotate", "+0+0", text,
+            ")",
+            "-gravity", "NorthEast", "-geometry", f"+{margin_x}+{margin_y}",
+            "-composite",
+            "-define", "png:compression-level=1",
             out_path
         ], check=True, stderr=subprocess.DEVNULL)
 except Exception:
