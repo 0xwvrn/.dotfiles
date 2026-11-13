@@ -160,7 +160,7 @@ if [ -x "${HOME}/.local/bin/wal-extra" ]; then
     "${HOME}/.local/bin/wal-extra" & PIDS+=($!)
 fi
 if [ -x "${HOME}/.local/bin/generate-swaylock-bg" ]; then
-    "${HOME}/.local/bin/generate-swaylock-bg" --force & PIDS+=($!)
+    "${HOME}/.local/bin/generate-swaylock-bg" --force &
 fi
 
 # Wait for parallel updates to complete

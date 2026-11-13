@@ -48,9 +48,21 @@ def main():
 
     # 1366x768 base wallpaper for instantaneous swaylock display rendering
     base_wp = "/tmp/swaylock-base.png"
-    need_base = (force or not os.path.exists(base_wp) or 
-                 os.path.getmtime(base_wp) < os.path.getmtime(wallpaper) or
-                 os.path.getsize(base_wp) == 0)
+    base_info_file = "/tmp/swaylock-base.info"
+    prev_wp = ""
+    if os.path.exists(base_info_file):
+        try:
+            with open(base_info_file) as f:
+                prev_wp = f.read().strip()
+        except Exception:
+            pass
+
+    base_stale = os.path.exists(base_wp) and os.path.getmtime(base_wp) < os.path.getmtime(wallpaper)
+    need_base = (not os.path.exists(base_wp) or 
+                 os.path.getsize(base_wp) == 0 or
+                 base_stale or 
+                 prev_wp != wallpaper)
+
     if need_base:
         try:
             subprocess.run([
@@ -61,6 +73,8 @@ def main():
                 "-define", "png:compression-level=1",
                 base_wp
             ], check=True, stderr=subprocess.DEVNULL)
+            with open(base_info_file, "w") as f:
+                f.write(wallpaper)
         except Exception:
             base_wp = wallpaper
 
