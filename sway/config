@@ -109,6 +109,14 @@ bindgesture swipe:3:left workspace next
     # Exit sway session & power menu
     bindsym $mod+m exec ~/.local/bin/sway-exit-menu
     bindsym $super+m exec ~/.local/bin/sway-exit-menu
+
+    # Direct system power shortcuts (Shutdown, Reboot, Lock)
+    bindsym $mod+Shift+Delete exec systemctl poweroff
+    bindsym $super+Shift+Delete exec systemctl poweroff
+    bindsym $mod+Shift+BackSpace exec systemctl reboot
+    bindsym $super+Shift+BackSpace exec systemctl reboot
+    bindsym $mod+Shift+Escape exec swaylock
+    bindsym $super+Shift+Escape exec swaylock
 #
 # Moving around:
 #

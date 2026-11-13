@@ -83,6 +83,9 @@
 | `Super / Alt + Shift + r` | **Reload Sway** | Refresh and re-read Sway configuration |
 | `Super / Alt + Shift + b` | **Toggle Waybar** | Hide or unhide Waybar on demand |
 | `Super / Alt + m` | **Power & Exit Menu** | Lock, Logout, Reboot, Suspend, Shutdown |
+| `Super / Alt + Shift + Delete` | **Direct Shutdown** | Instant system shutdown (`systemctl poweroff`) |
+| `Super / Alt + Shift + BackSpace` | **Direct Reboot** | Instant system restart (`systemctl reboot`) |
+| `Super / Alt + Shift + Escape` | **Lock Screen** | Instant lock with battery badge (`swaylock`) |
 | `Lid Close / swaylock` | **Instant Lockscreen** | High-speed lockscreen with battery badge |
 
 ---
