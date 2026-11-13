@@ -28,3 +28,9 @@ sleep 0.6
 
 # 4. Land on Workspace 1 (empty and clean)
 swaymsg "workspace number 1"
+
+# 5. Pre-warm lockscreen background & run lightweight periodic battery refresh for instant locking
+if [ -x "$HOME/.local/bin/generate-swaylock-bg" ]; then
+    "$HOME/.local/bin/generate-swaylock-bg" &
+    (while sleep 120; do "$HOME/.local/bin/generate-swaylock-bg"; done) &
+fi

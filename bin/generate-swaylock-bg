@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""
+generate-swaylock-bg: Asynchronously pre-renders 1:1 display-scaled lockscreen background
+with dynamic battery status badge so swaylock can launch instantly with 0ms lag.
+"""
+
+import os, sys, subprocess, json
+
+def main():
+    wal_file = os.path.expanduser("~/.cache/wal/wal")
+    colors_file = os.path.expanduser("~/.cache/wal/colors.json")
+    if not os.path.exists(wal_file) or not os.path.exists(colors_file):
+        sys.exit(0)
+
+    try:
+        with open(wal_file) as f:
+            wallpaper = f.read().strip()
+    except Exception:
+        sys.exit(0)
+
+    if not wallpaper or not os.path.exists(wallpaper):
+        sys.exit(0)
+
+    cap = ""
+    stat = ""
+    for bat in ["BAT0", "BAT1"]:
+        bat_path = f"/sys/class/power_supply/{bat}"
+        if os.path.exists(bat_path):
+            try:
+                with open(f"{bat_path}/capacity") as f:
+                    cap = int(f.read().strip())
+                with open(f"{bat_path}/status") as f:
+                    stat = f.read().strip()
+                break
+            except Exception:
+                pass
+
+    info_str = f"{wallpaper}:{cap}:{stat}"
+    info_file = "/tmp/swaylock-battery.info"
+    force = "--force" in sys.argv
+    if not force and os.path.exists(info_file) and os.path.exists("/tmp/swaylock-battery.png"):
+        try:
+            with open(info_file) as f:
+                if f.read().strip() == info_str:
+                    sys.exit(0)
+        except Exception:
+            pass
+
+    # 1366x768 base wallpaper for instantaneous swaylock display rendering
+    base_wp = "/tmp/swaylock-base.png"
+    need_base = (force or not os.path.exists(base_wp) or 
+                 os.path.getmtime(base_wp) < os.path.getmtime(wallpaper) or
+                 os.path.getsize(base_wp) == 0)
+    if need_base:
+        try:
+            subprocess.run([
+                "magick", wallpaper,
+                "-resize", "1366x768^",
+                "-gravity", "center",
+                "-extent", "1366x768",
+                "-define", "png:compression-level=1",
+                base_wp
+            ], check=True, stderr=subprocess.DEVNULL)
+        except Exception:
+            base_wp = wallpaper
+
+    try:
+        with open(colors_file) as f:
+            data = json.load(f)
+        bg = data.get("special", {}).get("background", "#0d0c09")
+        fg = data.get("special", {}).get("foreground", "#d3d0bd")
+        accent = data.get("colors", {}).get("color4", "#7E8273")
+    except Exception:
+        bg, fg, accent = "#0d0c09", "#d3d0bd", "#7E8273"
+
+    if cap != "":
+        if stat == "Charging":
+            icon = "󰂄"
+        else:
+            icons = [
+                (90, "󰁹"), (80, "󰂂"), (70, "󰂁"), (60, "󰂀"), (50, "󰁿"),
+                (40, "󰁾"), (30, "󰁽"), (20, "󰁼"), (10, "󰁻"), (0, "󰂃")
+            ]
+            icon = "󰁹"
+            for threshold, ico in icons:
+                if cap >= threshold:
+                    icon = ico
+                    break
+
+        text = f"{icon}  {cap}%"
+        font_path = "/usr/share/fonts/TTF/RobotoMonoNerdFont-Bold.ttf"
+        if not os.path.exists(font_path):
+            font_path = "/usr/share/fonts/TTF/SymbolsNerdFont-Regular.ttf"
+
+        badge_w, badge_h = 185, 52
+        pointsize = 24
+        stroke_w = 2
+        margin_x, margin_y = 28, 28
+
+        tmp_out = "/tmp/swaylock-battery.png.tmp"
+        cmd = [
+            "magick", base_wp,
+            "(",
+                "-size", f"{badge_w}x{badge_h}", f"xc:{bg}",
+                "-stroke", accent, "-strokewidth", str(stroke_w),
+                "-draw", f"rectangle 0,0 {badge_w-1},{badge_h-1}",
+                "-font", font_path, "-pointsize", str(pointsize),
+                "-fill", fg, "-stroke", "none",
+                "-gravity", "center", "-annotate", "+0+0", text,
+            ")",
+            "-gravity", "NorthEast", "-geometry", f"+{margin_x}+{margin_y}",
+            "-composite",
+            "-define", "png:compression-level=1",
+            tmp_out
+        ]
+        try:
+            subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
+            os.replace(tmp_out, "/tmp/swaylock-battery.png")
+            with open(info_file, "w") as f:
+                f.write(info_str)
+        except Exception:
+            pass
+
+if __name__ == "__main__":
+    main()
