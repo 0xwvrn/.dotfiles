@@ -378,7 +378,7 @@ client.placeholder      $background $background $foreground $background $backgro
 # Restore wallpaper and colorscheme on startup
 exec ~/.local/bin/change-wallpaper --restore
 
-# Automated workspace setup on login
+# Background services on login
 exec ~/.local/bin/sway-startup
 
 # Night Light / Blue light filter (gammastep)

@@ -1,35 +1,9 @@
 #!/usr/bin/env bash
-# ~/.local/bin/sway-startup: Automated workspace layout on Sway login
-# Workspace 1: Empty (Clean view with wallpaper)
-# Workspace 2: Terminal (kitty)
-# Workspace 3: Zen Browser with Apple Music (music.apple.com)
-# Workspace 4: Zen Browser (General browsing)
+# ~/.local/bin/sway-startup: Background services on Sway login
 
 set -e
 
-# Wait for Sway IPC socket to initialize
-if [ -z "$SWAYSOCK" ]; then
-    exit 0
-fi
-
-sleep 0.6
-
-# 1. Workspace 2: Launch terminal (kitty)
-swaymsg "workspace number 2; exec kitty"
-sleep 0.4
-
-# 2. Workspace 3: Launch Zen with Apple Music
-swaymsg "workspace number 3; exec zen-browser https://music.apple.com"
-sleep 1.2
-
-# 3. Workspace 4: Launch second Zen window for regular browsing
-swaymsg "workspace number 4; exec zen-browser --new-window"
-sleep 0.6
-
-# 4. Land on Workspace 1 (empty and clean)
-swaymsg "workspace number 1"
-
-# 5. Pre-warm lockscreen background & run lightweight periodic battery refresh for instant locking
+# Pre-warm lockscreen background & run lightweight periodic battery refresh for instant locking
 if [ -x "$HOME/.local/bin/generate-swaylock-bg" ]; then
     "$HOME/.local/bin/generate-swaylock-bg" &
     (while sleep 120; do "$HOME/.local/bin/generate-swaylock-bg"; done) &
