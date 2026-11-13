@@ -81,6 +81,7 @@
 | `Super / Alt + Shift + w` | **Select Wallpaper** | Rofi visual wallpaper picker |
 | `Super / Alt + Ctrl + w` | **Random Wallpaper** | Instant wallpaper & theme shuffle |
 | `Super / Alt + Shift + r` | **Reload Sway** | Refresh and re-read Sway configuration |
+| `Super / Alt + Shift + b` | **Toggle Waybar** | Hide or unhide Waybar on demand |
 | `Super / Alt + m` | **Power & Exit Menu** | Lock, Logout, Reboot, Suspend, Shutdown |
 | `Lid Close / swaylock` | **Instant Lockscreen** | High-speed lockscreen with battery badge |
 

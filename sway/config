@@ -401,5 +401,6 @@ bar {
 }
 
 bindsym $mod+Shift+b exec killall -SIGUSR1 waybar
+bindsym $super+Shift+b exec killall -SIGUSR1 waybar
 
 include /etc/sway/config.d/*
