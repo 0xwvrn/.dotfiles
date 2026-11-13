@@ -6,6 +6,7 @@
 ### Variables
 #
 set $mod Mod1
+set $super Mod4
 # Home row direction keys, like vim
 set $left h
 set $down j
@@ -61,56 +62,93 @@ bindgesture swipe:3:left workspace next
 #
     # Start a terminal
     bindsym $mod+Return exec $term
+    bindsym $super+Return exec $term
 
-    # browser
+    # Web browser
+    bindsym $mod+w exec zen-browser
+    bindsym $super+w exec zen-browser
     bindsym $mod+Ctrl+b exec zen-browser
 
-    # Kill focused window
-    bindsym $mod+e kill
+    # File manager (Ranger floating TUI & Dolphin GUI)
+    bindsym $mod+e exec kitty --app-id floating-fm -e ranger
+    bindsym $super+e exec kitty --app-id floating-fm -e ranger
+    bindsym $mod+Shift+e exec kitty --app-id floating-fm -e ranger
+    bindsym $super+Shift+e exec kitty --app-id floating-fm -e ranger
+    bindsym $mod+Shift+d exec dolphin
+    bindsym $super+Shift+d exec dolphin
+
+    # Kill focused window (Vim :q style)
+    bindsym $mod+q kill
+    bindsym $super+q kill
 
     # Start your launcher
     bindsym $mod+Space exec $menu
+    bindsym $super+Space exec $menu
     
-    # Keybindings Cheat-Sheet HUD
+    # Keybindings Cheat-Sheet HUD & Help Page
     bindsym $mod+slash exec ~/.local/bin/keybinds-menu
+    bindsym $super+slash exec ~/.local/bin/keybinds-menu
     bindsym $mod+question exec ~/.local/bin/keybinds-menu
-    
-    # Drag floating windows by holding down $mod and left mouse button.
-    # Resize them with right mouse button + $mod.
-    # Despite the name, also works for non-floating windows.
-    # Change normal to inverse to use left mouse button for resizing and right
-    # mouse button for dragging.
+    bindsym $super+question exec ~/.local/bin/keybinds-menu
+    bindsym F1 exec ~/.local/bin/keybinds-menu
+    bindsym $mod+F1 exec ~/.local/bin/keybinds-menu
+    bindsym $super+F1 exec ~/.local/bin/keybinds-menu
+
+    # Full formatted help manual in Glow
+    bindsym $mod+Shift+question exec kitty --app-id floating-help -e glow -p /home/wvrn/.dotfiles/KEYBINDS.md
+    bindsym $super+Shift+question exec kitty --app-id floating-help -e glow -p /home/wvrn/.dotfiles/KEYBINDS.md
+    bindsym $mod+Shift+slash exec kitty --app-id floating-help -e glow -p /home/wvrn/.dotfiles/KEYBINDS.md
+    bindsym $super+Shift+slash exec kitty --app-id floating-help -e glow -p /home/wvrn/.dotfiles/KEYBINDS.md
+
     floating_modifier $mod normal
 
     # Reload the configuration file
     bindsym $mod+Shift+r reload
+    bindsym $super+Shift+r reload
 
-    # Exit sway session & power menu (toggle on/off)
+    # Exit sway session & power menu
     bindsym $mod+m exec ~/.local/bin/sway-exit-menu
+    bindsym $super+m exec ~/.local/bin/sway-exit-menu
 #
 # Moving around:
 #
-    # Move your focus around
+    # Move your focus around (Vim keys)
     bindsym $mod+$left focus left
     bindsym $mod+$down focus down
     bindsym $mod+$up focus up
     bindsym $mod+$right focus right
-    # Or use $mod+[up|down|left|right]
+    bindsym $super+$left focus left
+    bindsym $super+$down focus down
+    bindsym $super+$up focus up
+    bindsym $super+$right focus right
+    # Or use arrow keys
     bindsym $mod+Left focus left
     bindsym $mod+Down focus down
     bindsym $mod+Up focus up
     bindsym $mod+Right focus right
+    bindsym $super+Left focus left
+    bindsym $super+Down focus down
+    bindsym $super+Up focus up
+    bindsym $super+Right focus right
 
-    # Move the focused window with the same, but add Shift
+    # Move the focused window (Vim keys)
     bindsym $mod+Shift+$left move left
     bindsym $mod+Shift+$down move down
     bindsym $mod+Shift+$up move up
     bindsym $mod+Shift+$right move right
+    bindsym $super+Shift+$left move left
+    bindsym $super+Shift+$down move down
+    bindsym $super+Shift+$up move up
+    bindsym $super+Shift+$right move right
     # Ditto, with arrow keys
     bindsym $mod+Shift+Left move left
     bindsym $mod+Shift+Down move down
     bindsym $mod+Shift+Up move up
     bindsym $mod+Shift+Right move right
+    bindsym $super+Shift+Left move left
+    bindsym $super+Shift+Down move down
+    bindsym $super+Shift+Up move up
+    bindsym $super+Shift+Right move right
 #
 # Workspaces:
 #
@@ -125,6 +163,17 @@ bindgesture swipe:3:left workspace next
     bindsym $mod+8 workspace number 8
     bindsym $mod+9 workspace number 9
     bindsym $mod+0 workspace number 10
+    bindsym $super+1 workspace number 1
+    bindsym $super+2 workspace number 2
+    bindsym $super+3 workspace number 3
+    bindsym $super+4 workspace number 4
+    bindsym $super+5 workspace number 5
+    bindsym $super+6 workspace number 6
+    bindsym $super+7 workspace number 7
+    bindsym $super+8 workspace number 8
+    bindsym $super+9 workspace number 9
+    bindsym $super+0 workspace number 10
+
     # Move focused container to workspace
     bindsym $mod+Shift+1 move container to workspace number 1
     bindsym $mod+Shift+2 move container to workspace number 2
@@ -136,6 +185,22 @@ bindgesture swipe:3:left workspace next
     bindsym $mod+Shift+8 move container to workspace number 8
     bindsym $mod+Shift+9 move container to workspace number 9
     bindsym $mod+Shift+0 move container to workspace number 10
+    bindsym $super+Shift+1 move container to workspace number 1
+    bindsym $super+Shift+2 move container to workspace number 2
+    bindsym $super+Shift+3 move container to workspace number 3
+    bindsym $super+Shift+4 move container to workspace number 4
+    bindsym $super+Shift+5 move container to workspace number 5
+    bindsym $super+Shift+6 move container to workspace number 6
+    bindsym $super+Shift+7 move container to workspace number 7
+    bindsym $super+Shift+8 move container to workspace number 8
+    bindsym $super+Shift+9 move container to workspace number 9
+    bindsym $super+Shift+0 move container to workspace number 10
+
+    # Workspace tab cycling (Vim style gt / gT)
+    bindsym $mod+Tab workspace next
+    bindsym $mod+Shift+Tab workspace prev
+    bindsym $super+Tab workspace next
+    bindsym $super+Shift+Tab workspace prev
     # Note: workspaces can have any name you want, not just numbers.
     # We just use 1-10 as the default.
 #
@@ -152,6 +217,8 @@ bindgesture swipe:3:left workspace next
     for_window [app_id="dropdown-term"] floating enable, resize set 900 520, move position center, move scratchpad
     for_window [app_id="floating-notes"] floating enable, resize set 850 560, move position center
     for_window [app_id="floating-finder"] floating enable, resize set 1000 620, move position center
+    for_window [app_id="floating-fm"] floating enable, resize set 1000 620, move position center
+    for_window [app_id="floating-help"] floating enable, resize set 1050 660, move position center
     for_window [app_id="tui-monitor"] floating enable, resize set 1000 620, move position center
     # Automatically route Apple Music in Zen to workspace 3
     for_window [app_id="zen" title=".*Apple.*Music.*"] move container to workspace number 3
@@ -159,24 +226,33 @@ bindgesture swipe:3:left workspace next
     # $mod+b or $mod+v, for horizontal and vertical splits
     # respectively.
     bindsym $mod+b splith
+    bindsym $super+b splith
     bindsym $mod+v splitv
+    bindsym $super+v splitv
 
     # Switch the current container between different layout styles
     bindsym $mod+s layout stacking
+    bindsym $super+s layout stacking
     bindsym $mod+w layout tabbed
+    bindsym $super+w layout tabbed
     bindsym $mod+t layout toggle split
+    bindsym $super+t layout toggle split
 
     # Make the current focus fullscreen
     bindsym $mod+f fullscreen
+    bindsym $super+f fullscreen
 
     # Toggle the current focus between tiling and floating mode
     bindsym $mod+Shift+space floating toggle
+    bindsym $super+Shift+space floating toggle
 
     # Swap focus between the tiling area and the floating area
     bindsym $mod+Ctrl+space focus mode_toggle
+    bindsym $super+Ctrl+space focus mode_toggle
 
     # Move focus to the parent container
     bindsym $mod+a focus parent
+    bindsym $super+a focus parent
 #
 # Scratchpad:
 #
@@ -185,10 +261,12 @@ bindgesture swipe:3:left workspace next
 
     # Move the currently focused window to the scratchpad
     bindsym $mod+Shift+minus move scratchpad
+    bindsym $super+Shift+minus move scratchpad
 
     # Show the next scratchpad window or hide the focused scratchpad window.
     # If there are multiple scratchpad windows, this command cycles through them.
     bindsym $mod+minus scratchpad show
+    bindsym $super+minus scratchpad show
 #
 # Resizing containers:
 #
@@ -202,6 +280,12 @@ mode "resize" {
     bindsym $up resize shrink height 10px
     bindsym $right resize grow width 10px
 
+    # Shift for large adjustments (30px)
+    bindsym Shift+$left resize shrink width 30px
+    bindsym Shift+$down resize grow height 30px
+    bindsym Shift+$up resize shrink height 30px
+    bindsym Shift+$right resize grow width 30px
+
     # Ditto, with arrow keys
     bindsym Left resize shrink width 10px
     bindsym Down resize grow height 10px
@@ -211,8 +295,10 @@ mode "resize" {
     # Return to default mode
     bindsym Return mode "default"
     bindsym Escape mode "default"
+    bindsym q mode "default"
 }
 bindsym $mod+r mode "resize"
+bindsym $super+r mode "resize"
 #
 # Utilities:
 #
@@ -231,8 +317,11 @@ bindsym $mod+r mode "resize"
 
     # Keyboard fallback bindings
     bindsym $mod+p exec playerctl play-pause
+    bindsym $super+p exec playerctl play-pause
     bindsym $mod+bracketright exec playerctl next
+    bindsym $super+bracketright exec playerctl next
     bindsym $mod+bracketleft exec playerctl previous
+    bindsym $super+bracketleft exec playerctl previous
     # Special keys to adjust brightness via brightnessctl
     bindsym --locked XF86MonBrightnessDown exec brightnessctl set 5%-
     bindsym --locked XF86MonBrightnessUp exec brightnessctl set 5%+
@@ -240,32 +329,43 @@ bindsym $mod+r mode "resize"
     bindsym Print exec ~/.local/bin/screenshot --full
     bindsym Shift+Print exec ~/.local/bin/screenshot --area
     bindsym $mod+Print exec ~/.local/bin/screenshot --area
+    bindsym $super+Print exec ~/.local/bin/screenshot --area
 
     # Searchable clipboard history
     bindsym $mod+c exec ~/.local/bin/clipboard-menu
+    bindsym $super+c exec ~/.local/bin/clipboard-menu
 
     # Instant dropdown scratchpad terminal
     bindsym $mod+grave exec ~/.local/bin/toggle-dropdown
+    bindsym $super+grave exec ~/.local/bin/toggle-dropdown
 
     # Quick floating scratchpad notes
     bindsym $mod+n exec kitty --app-id floating-notes -e ~/.local/bin/quick-notes
+    bindsym $super+n exec kitty --app-id floating-notes -e ~/.local/bin/quick-notes
 
     # Interactive fuzzy file & code finder
     bindsym $mod+Shift+f exec kitty --app-id floating-finder -e ~/.local/bin/finder
+    bindsym $super+Shift+f exec kitty --app-id floating-finder -e ~/.local/bin/finder
 
-    # System Monitor (htop)
-    bindsym $mod+Shift+m exec kitty --app-id tui-monitor -e htop
+    # System Monitor (bottom)
+    bindsym $mod+Shift+m exec kitty --app-id tui-monitor -e btm
+    bindsym $super+Shift+m exec kitty --app-id tui-monitor -e btm
 
     # Wallpaper & dynamic color switcher
     bindsym $mod+Shift+w exec ~/.local/bin/change-wallpaper --select
+    bindsym $super+Shift+w exec ~/.local/bin/change-wallpaper --select
     bindsym $mod+Ctrl+w exec ~/.local/bin/change-wallpaper --random
+    bindsym $super+Ctrl+w exec ~/.local/bin/change-wallpaper --random
 
     # Minimal Wi-Fi selector
     bindsym $mod+Shift+n exec ~/.local/bin/rofi-wifi-menu
+    bindsym $super+Shift+n exec ~/.local/bin/rofi-wifi-menu
 
     # Minimal TUI System Settings
     bindsym $mod+comma exec kitty --app-id tui-settings -e ~/.local/bin/settings
+    bindsym $super+comma exec kitty --app-id tui-settings -e ~/.local/bin/settings
     bindsym $mod+Shift+s exec kitty --app-id tui-settings -e ~/.local/bin/settings
+    bindsym $super+Shift+s exec kitty --app-id tui-settings -e ~/.local/bin/settings
 
 # Window colors (borderless)
 # class                 border      bground     text        indicator   child_border
