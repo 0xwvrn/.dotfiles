@@ -384,7 +384,7 @@ client.urgent           $color1     $color1     $foreground $color1     $color1
 client.placeholder      $background $background $foreground $background $background
 
 # Restore wallpaper and colorscheme on startup
-exec ~/.local/bin/change-wallpaper --restore
+exec ~/.local/bin/change-wallpaper --restore --quiet
 
 # Background services on login
 exec ~/.local/bin/sway-startup

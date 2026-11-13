@@ -24,6 +24,7 @@ usage() {
     echo "  -r, --random       Pick a random wallpaper from ${WALLPAPER_DIR}"
     echo "  -s, --select       Select a wallpaper using rofi menu"
     echo "  --restore          Restore the last set wallpaper & colorscheme"
+    echo "  -q, --quiet        Silence notifications"
     echo "  -h, --help         Show this help message"
     echo ""
     echo "If no arguments are provided, the interactive rofi selector is opened."
@@ -57,34 +58,47 @@ pick_random() {
 }
 
 TARGET_IMAGE=""
+IS_RESTORE="false"
+QUIET="false"
 
-case "$1" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-    -r|--random)
-        TARGET_IMAGE=$(pick_random)
-        ;;
-    -s|--select)
-        TARGET_IMAGE=$(select_with_rofi)
-        ;;
-    --restore)
-        IS_RESTORE="true"
-        if [ -f "$CURRENT_WAL_FILE" ]; then
-            TARGET_IMAGE=$(cat "$CURRENT_WAL_FILE")
-        else
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -q|--quiet)
+            QUIET="true"
+            shift
+            ;;
+        -r|--random)
             TARGET_IMAGE=$(pick_random)
-        fi
-        ;;
-    "")
-        # Default with no arguments: open interactive picker
-        TARGET_IMAGE=$(select_with_rofi)
-        ;;
-    *)
-        TARGET_IMAGE="$1"
-        ;;
-esac
+            shift
+            ;;
+        -s|--select)
+            TARGET_IMAGE=$(select_with_rofi)
+            shift
+            ;;
+        --restore)
+            IS_RESTORE="true"
+            if [ -f "$CURRENT_WAL_FILE" ]; then
+                TARGET_IMAGE=$(cat "$CURRENT_WAL_FILE")
+            else
+                TARGET_IMAGE=$(pick_random)
+            fi
+            shift
+            ;;
+        *)
+            TARGET_IMAGE="$1"
+            shift
+            ;;
+    esac
+done
+
+# If no target specified and not restoring, open interactive picker
+if [ -z "$TARGET_IMAGE" ]; then
+    TARGET_IMAGE=$(select_with_rofi)
+fi
 
 # If user cancelled selection or empty
 if [ -z "$TARGET_IMAGE" ]; then
@@ -181,7 +195,7 @@ if os.path.exists(colors_file):
 " 2>/dev/null || true
 
 # 9. Notify user
-if command -v notify-send >/dev/null 2>&1; then
+if [ "$IS_RESTORE" != "true" ] && [ "$QUIET" != "true" ] && command -v notify-send >/dev/null 2>&1; then
     notify-send -i "$TARGET_IMAGE" "Theme Updated" "Active wallpaper: $(basename "$TARGET_IMAGE")" 2>/dev/null || true
 fi
 
