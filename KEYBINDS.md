@@ -32,7 +32,7 @@
 | `Super / Alt + v` | **Vertical Split** | Split current window side-by-side (`:vsplit`) |
 | `Super / Alt + b` | **Horizontal Split** | Split current window top/bottom (`:split`) |
 | `Super / Alt + s` | **Stacking Layout** | Stack windows on top of each other |
-| `Super / Alt + w` | **Tabbed Layout** | Tabbed window presentation |
+| `Super / Alt + Shift + t` | **Tabbed Layout** | Tabbed window presentation |
 | `Super / Alt + t` | **Toggle Split Style** | Toggle between split layouts |
 | `Super / Alt + r` | **Resize Mode** | Enter resize mode (`h/j/k/l` to resize, `Esc`/`q` to exit) |
 

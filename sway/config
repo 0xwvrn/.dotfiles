@@ -233,8 +233,8 @@ bindgesture swipe:3:left workspace next
     # Switch the current container between different layout styles
     bindsym $mod+s layout stacking
     bindsym $super+s layout stacking
-    bindsym $mod+w layout tabbed
-    bindsym $super+w layout tabbed
+    bindsym $mod+Shift+t layout tabbed
+    bindsym $super+Shift+t layout tabbed
     bindsym $mod+t layout toggle split
     bindsym $super+t layout toggle split
 

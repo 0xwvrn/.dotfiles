@@ -39,7 +39,7 @@ ITEMS=(
     "󰌌  [WINDOW]    Super/Alt + Shift + Space    Toggle Floating Window"
     "󰌌  [SPLIT]     Super/Alt + v                Vertical Split"
     "󰌌  [SPLIT]     Super/Alt + b                Horizontal Split"
-    "󰌌  [LAYOUT]    Super/Alt + s / w / t        Stacking / Tabbed / Toggle"
+    "󰌌  [LAYOUT]    Super/Alt + s / S-t / t      Stacking / Tabbed / Toggle"
     "󰌌  [WORKSPACE] Super/Alt + 1..9             Switch to Workspace"
     "󰌌  [WORKSPACE] Super/Alt + Shift + 1..9     Move Container to Workspace"
     "󰌌  [WORKSPACE] Super/Alt + Tab / S-Tab      Next / Previous Workspace"
