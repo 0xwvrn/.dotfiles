@@ -228,6 +228,7 @@ bindgesture swipe:3:left workspace next
     for_window [app_id="floating-fm"] floating enable, resize set 1000 620, move position center
     for_window [app_id="floating-help"] floating enable, resize set 1050 660, move position center
     for_window [app_id="tui-monitor"] floating enable, resize set 1000 620, move position center
+    for_window [app_id="tui-music"] floating enable, resize set 1000 620, move position center
     # Automatically route Apple Music in Zen to workspace 3
     for_window [app_id="zen" title=".*Apple.*Music.*"] move container to workspace number 3
     # You can "split" the current object of your focus with
@@ -358,6 +359,10 @@ bindsym $super+r mode "resize"
     # System Monitor (bottom)
     bindsym $mod+Shift+m exec kitty --app-id tui-monitor -e btm
     bindsym $super+Shift+m exec kitty --app-id tui-monitor -e btm
+
+    # TUI Audio Player (cmus)
+    bindsym $mod+Shift+a exec kitty --app-id tui-music -e cmus
+    bindsym $super+Shift+a exec kitty --app-id tui-music -e cmus
 
     # Wallpaper & dynamic color switcher
     bindsym $mod+Shift+w exec ~/.local/bin/change-wallpaper --select

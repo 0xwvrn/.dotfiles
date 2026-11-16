@@ -1253,6 +1253,40 @@ def update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg):
         print(f"Updated Discord/Vesktop theme: {target}")
 
 
+def update_cmus():
+    """Generates dynamic pywal theme for cmus TUI player."""
+    cmus_dir = os.path.expanduser("~/.config/cmus")
+    os.makedirs(cmus_dir, exist_ok=True)
+    theme_file = os.path.join(cmus_dir, "pywal.theme")
+    theme_content = """# cmus pywal dynamic theme
+set color_win_bg=default
+set color_win_fg=default
+set color_win_title_bg=blue
+set color_win_title_fg=white
+set color_titleline_bg=blue
+set color_titleline_fg=white
+set color_statusline_bg=default
+set color_statusline_fg=cyan
+set color_win_cur=cyan
+set color_win_cur_sel_bg=blue
+set color_win_cur_sel_fg=white
+set color_win_inactive_cur_sel_bg=default
+set color_win_inactive_cur_sel_fg=cyan
+set color_win_sel_bg=blue
+set color_win_sel_fg=white
+set color_win_inactive_sel_bg=default
+set color_win_inactive_sel_fg=white
+set color_separator=blue
+set color_cmdline_bg=default
+set color_cmdline_fg=default
+set color_error=lightred
+set color_info=lightyellow
+"""
+    with open(theme_file, "w", encoding="utf-8") as f:
+        f.write(theme_content)
+    print(f"Updated cmus theme: {theme_file}")
+
+
 def update_shells():
     """Ensures ~/.bashrc and ~/.zshrc source terminal sequences and fzf."""
     snippet = """
@@ -1319,6 +1353,7 @@ def main():
     update_gdu(bg_hex, fg, accent, c, on_accent, selection_bg, selection_fg)
     update_cava(c)
     update_discord(bg_hex, fg, accent, c, bg_dark, hover_bg)
+    update_cmus()
     update_shells()
 
 if __name__ == "__main__":

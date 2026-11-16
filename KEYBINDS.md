@@ -62,6 +62,7 @@
 | `Super / Alt + Shift + d` | **Dolphin** | GUI file manager |
 | `Super / Alt + Shift + f` | **Fuzzy File Finder** | Floating `fzf` code & file finder |
 | `Super / Alt + Shift + m` | **System Monitor** | Floating `bottom` (`btm`) resource monitor |
+| `Super / Alt + Shift + a` | **Audio Player (cmus)** | Floating Vim-first TUI music player (`h/j/k/l`) |
 | `Super / Alt + n` | **Scratchpad Notes** | Instant floating quick sticky notes |
 | `Super / Alt + \`` (grave) | **Dropdown Terminal** | Fast drop-down terminal scratchpad |
 | `Super / Alt + Shift + -` | **Send to Scratchpad** | Hide current window to background scratchpad |
@@ -132,3 +133,16 @@
 - `z` : Advance subtitles backward (-100ms).
 - `Z` (`Shift + z`) : Delay subtitles forward (+100ms).
 - `Ctrl + z` : Reset subtitle delay to 0.
+
+### cmus TUI Audio Player:
+- `Super / Alt + Shift + a` : Launch floating audio player.
+- `j / k` : Move down / up in playlist or tracklist.
+- `Enter` : Play selected artist / album / track.
+- `c` : Toggle Play / Pause.
+- `v` : Stop playback.
+- `b / z` : Next / Previous track.
+- `x` : Restart track.
+- `/` : Search library (`n` for next match).
+- `1` - `5` : Switch views (1: Tree, 2: Sorted, 3: Playlist, 4: Queue, 5: File Browser).
+- `+` / `-` : Volume up / down.
+- `q` : Exit cmus.
