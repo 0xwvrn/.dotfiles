@@ -1,56 +1,8 @@
-#!/usr/bin/env python3
-# ~/.local/bin/toggle-music: Toggle instant floating audio player scratchpad in Sway
+#!/usr/bin/env bash
+# ~/.local/bin/toggle-music: Toggle instant floating cmus player scratchpad in Sway
 
-import json
-import os
-import subprocess
-import sys
-import time
-
-def toggle():
-    try:
-        tree = json.loads(subprocess.check_output(["swaymsg", "-t", "get_tree"], stderr=subprocess.DEVNULL))
-    except Exception:
-        sys.exit(0)
-
-    node = None
-    def find(n):
-        nonlocal node
-        if n.get("app_id") == "tui-music":
-            node = n
-            return
-        for k in ["nodes", "floating_nodes"]:
-            for c in n.get(k, []):
-                find(c)
-    find(tree)
-
-    if not node:
-        # Not running yet: spawn it and show on screen
-        music_player = os.path.expanduser("~/.local/bin/tui-music-player")
-        subprocess.Popen(["kitty", "--app-id", "tui-music", "-e", music_player])
-        for _ in range(30):
-            time.sleep(0.04)
-            p = subprocess.run(
-                ["swaymsg", '[app_id="tui-music"] scratchpad show'],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            if p.returncode == 0:
-                break
-    elif node.get("visible") and node.get("focused"):
-        # Visible and focused: hide it into scratchpad (music continues playing!)
-        subprocess.run(
-            ["swaymsg", '[app_id="tui-music"] move scratchpad'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    else:
-        # Hidden in scratchpad or behind other windows: bring to front and focus
-        subprocess.run(
-            ["swaymsg", '[app_id="tui-music"] scratchpad show'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-
-if __name__ == "__main__":
-    toggle()
+if ! swaymsg '[app_id="tui-music"] scratchpad show' >/dev/null 2>&1; then
+    kitty --app-id tui-music -e cmus &
+    sleep 0.18
+    swaymsg '[app_id="tui-music"] scratchpad show' >/dev/null 2>&1 || true
+fi

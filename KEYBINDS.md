@@ -62,7 +62,7 @@
 | `Super / Alt + Shift + d` | **Dolphin** | GUI file manager |
 | `Super / Alt + Shift + f` | **Fuzzy File Finder** | Floating `fzf` code & file finder |
 | `Super / Alt + Shift + m` | **System Monitor** | Floating `bottom` (`btm`) resource monitor |
-| `Super / Alt + Shift + a` | **Toggle Audio Player** | Instant scratchpad music player (keeps playing in background) |
+| `Super / Alt + Shift + a` | **Toggle Audio Player (cmus)** | Instant scratchpad music player (keeps playing in background) |
 | `Super / Alt + n` | **Scratchpad Notes** | Instant floating quick sticky notes |
 | `Super / Alt + \`` (grave) | **Dropdown Terminal** | Fast drop-down terminal scratchpad |
 | `Super / Alt + Shift + -` | **Send to Scratchpad** | Hide current window to background scratchpad |
@@ -134,15 +134,13 @@
 - `Z` (`Shift + z`) : Delay subtitles forward (+100ms).
 - `Ctrl + z` : Reset subtitle delay to 0.
 
-### TUI Audio Player (Scratchpad):
+### cmus TUI Audio Player (Scratchpad):
 - `Super / Alt + Shift + a` : **Toggle window on / off** (audio continues playing uninterrupted in background).
+- `Enter` : Play selected track.
 - `Space` : Toggle Play / Pause.
-- `← / →` (or `h / l`) : Seek 5 seconds backward / forward.
-- `↓ / ↑` : Seek 1 minute backward / forward.
-- `9 / 0` (or `- / +`) : Volume down / up.
-- `< / >` : Previous / Next track.
-- `q` : Stop track and return to track list.
-- `Enter` : Play track (in song selector).
-- `Tab` : Select multiple tracks.
-- `Ctrl + a` : Play all tracks in library.
-- `Esc` : Hide window to background.
+- `j / k` : Browse up / down through library (always accessible, even during active playback).
+- `b / z` : Next / Previous track.
+- `+ / -` : Volume up / down.
+- `h / l` (or `← / →`) : Seek 5s backward / forward.
+- `/` : Search library (`n` for next match).
+- `q` : Quit cmus.
