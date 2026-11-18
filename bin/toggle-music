@@ -53,5 +53,6 @@ elif node.get("visible") and node.get("focused"):
     # Currently on screen and focused: hide it into scratchpad
     subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] move scratchpad'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 else:
-    # In scratchpad or unfocused: bring to front, focus, and ensure centered geometry
+    # In scratchpad or unfocused: bring to front, focus, ensure centered geometry, and rescan new tracks
     subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 840 480, move position center, focus'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(["cmus-remote", "-C", "add -l /home/wvrn/Music"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

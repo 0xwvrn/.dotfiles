@@ -143,4 +143,6 @@
 - `+ / -` : Volume up / down.
 - `h / l` (or `← / →`) : Seek 5s backward / forward.
 - `/` : Search library (`n` for next match).
+- `r` : Rescan `~/Music` library (auto-adds any newly downloaded songs).
+- `R` : Update track metadata cache.
 - `q` : Quit cmus.
