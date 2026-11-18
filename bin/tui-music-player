@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# ~/.local/bin/tui-music-player: Lightweight, single-tap music player with fzf & mpv
+
+MUSIC_DIR="${HOME}/Music"
+mkdir -p "$MUSIC_DIR"
+
+# Source Pywal colors for fzf if available
+if [ -f "$HOME/.cache/wal/colors-fzf.sh" ]; then
+    source "$HOME/.cache/wal/colors-fzf.sh"
+fi
+
+show_banner() {
+    clear
+    echo -e "\033[1;36m󰎆  TUI Music Player\033[0m"
+    echo -e "\033[0;90m─────────────────────────────────────────────────────────────────\033[0m"
+    echo -e " \033[1mSingle-tap controls during playback:\033[0m"
+    echo -e "   \033[33mSpace\033[0m           Pause / Play toggle"
+    echo -e "   \033[33m← / →\033[0m (or h/l)   Seek 5s backward / forward"
+    echo -e "   \033[33m↓ / ↑\033[0m           Seek 1m backward / forward"
+    echo -e "   \033[33m9 / 0\033[0m (or -/+)   Volume down / up"
+    echo -e "   \033[33m< / >\033[0m           Previous / Next track"
+    echo -e "   \033[33mSuper+Shift+a\033[0m   Toggle window on/off (Audio keeps playing!)"
+    echo -e "   \033[33mq\033[0m               Stop track & return to list"
+    echo -e "\033[0;90m─────────────────────────────────────────────────────────────────\033[0m"
+    echo ""
+}
+
+play_tracks() {
+    local tracks=("$@")
+    if [ ${#tracks[@]} -eq 0 ]; then
+        return
+    fi
+    show_banner
+    mpv --no-video \
+        --term-osd-bar \
+        --term-osd-bar-chars="━━╸━" \
+        --input-default-bindings=yes \
+        --input-terminal=yes \
+        "${tracks[@]}"
+}
+
+while true; do
+    FILES=()
+    while IFS= read -r -d '' file; do
+        FILES+=("$file")
+    done < <(find "$MUSIC_DIR" -type f \( -iname "*.flac" -o -iname "*.mp3" -o -iname "*.m4a" -o -iname "*.ogg" -o -iname "*.wav" -o -iname "*.opus" -o -iname "*.aac" \) -print0 2>/dev/null | sort -z)
+
+    if [ ${#FILES[@]} -eq 0 ]; then
+        clear
+        echo -e "\033[1;33mNo audio files found in ~/Music\033[0m"
+        echo "Place your audio tracks (.flac, .mp3, .wav, .m4a) in ~/Music."
+        echo ""
+        read -rp "Press Enter to exit..."
+        exit 0
+    fi
+
+    HEADER="[Enter: Play] [Tab: Select Multiple] [Ctrl+A: Play All] [Esc: Hide Window]"
+
+    CHOSEN=$(printf "%s\n" "${FILES[@]}" | sed "s|^$MUSIC_DIR/||" | fzf \
+        --multi \
+        --prompt="󰎆 Select Track > " \
+        --header="$HEADER" \
+        --border=none \
+        --bind="ctrl-a:select-all" \
+        --preview="ffprobe -hide_banner '$MUSIC_DIR/{}' 2>&1 | grep -iE 'artist|title|album|date|duration' | head -n 6" \
+        --preview-window=right:45%:wrap)
+
+    if [ -z "$CHOSEN" ]; then
+        # User pressed Esc in fzf: hide window to scratchpad
+        if command -v swaymsg >/dev/null 2>&1; then
+            swaymsg '[app_id="tui-music"] move scratchpad' >/dev/null 2>&1 || exit 0
+            # Wait until window is recalled
+            sleep 1
+            continue
+        else
+            exit 0
+        fi
+    fi
+
+    SELECTED_TRACKS=()
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            SELECTED_TRACKS+=("$MUSIC_DIR/$line")
+        fi
+    done <<< "$CHOSEN"
+
+    play_tracks "${SELECTED_TRACKS[@]}"
+done
