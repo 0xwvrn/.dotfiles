@@ -139,7 +139,8 @@
 - `1` : **All Songs View** (clean sorted list of every track).
 - `2` : **Artist Specific View** (browse by artist to play/shuffle only their tracks).
 - `Tab` : Switch between Artist list and Track list (in Artist View).
-- `s` : **Toggle Shuffle** (on / off).
+- `s` : **Sort Music Menu** (prompt sort options: title, artist, album, date, duration, play_count).
+- `S` (`Shift + s`) : **Toggle Shuffle** (on / off).
 - `a` : **Toggle Artist Scope** (`aaa_mode`: all library vs current artist only).
 - `Space` : Toggle Play / Pause.
 - `Enter` : Play selected track.

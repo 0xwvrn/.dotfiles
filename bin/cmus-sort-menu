@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# ~/.local/bin/cmus-sort-menu: Instant sort menu for cmus
+# Can be executed standalone, via Rofi, or via Sway keybinding
+
+OPTIONS=(
+    "󰎆  Title (A-Z)             :title"
+    "󰎆  Title (Z-A)             :-title"
+    "  Artist (A-Z)            :artist album discnumber tracknumber title filename"
+    "  Artist (Z-A)            :-artist album discnumber tracknumber title filename"
+    "󰀥  Album                   :album discnumber tracknumber title"
+    "󱑈  Recently Added (Newest) :-filemtime"
+    "󱑈  Oldest Added            :filemtime"
+    "󰥔  Duration (Longest)      :-duration"
+    "󰥔  Duration (Shortest)     :duration"
+    "󰤽  Play Count (Most)       :-play_count"
+    "  Shuffle / Randomize     :shuffle"
+)
+
+selected=$(printf "%s\n" "${OPTIONS[@]}" | rofi -dmenu -i -p "󰒺 Sort Music" -theme-str 'window {width: 440px;} listview {lines: 9;}')
+
+if [ -n "$selected" ]; then
+    key=$(echo "$selected" | awk -F':' '{print $NF}')
+    if [ "$key" = "shuffle" ]; then
+        cmus-remote -C "set shuffle=tracks"
+        cmus-remote -C "reshuffle"
+    else
+        cmus-remote -C "set lib_sort=$key"
+    fi
+fi
