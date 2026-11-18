@@ -1,88 +1,398 @@
-#!/usr/bin/env bash
-# ~/.local/bin/tui-music-player: Lightweight, single-tap music player with fzf & mpv
+#!/usr/bin/env python3
+"""
+tui-music-player: A lightweight, Vim-first terminal music player powered by mpv IPC.
+- Allows browsing the library with j/k while music is playing.
+- Instant single-tap playback, volume, and seeking controls.
+- Runs smoothly inside a floating Sway scratchpad window.
+"""
 
-MUSIC_DIR="${HOME}/Music"
-mkdir -p "$MUSIC_DIR"
+import curses
+import json
+import os
+import socket
+import subprocess
+import sys
+import time
 
-# Source Pywal colors for fzf if available
-if [ -f "$HOME/.cache/wal/colors-fzf.sh" ]; then
-    source "$HOME/.cache/wal/colors-fzf.sh"
-fi
+MUSIC_DIR = os.path.expanduser("~/Music")
+SOCKET_PATH = f"/tmp/tui_music_player_{os.getuid()}.sock"
+SUPPORTED_EXTS = {".flac", ".mp3", ".m4a", ".ogg", ".wav", ".opus", ".aac", ".wma"}
 
-show_banner() {
-    clear
-    echo -e "\033[1;36m󰎆  TUI Music Player\033[0m"
-    echo -e "\033[0;90m─────────────────────────────────────────────────────────────────\033[0m"
-    echo -e " \033[1mSingle-tap controls during playback:\033[0m"
-    echo -e "   \033[33mSpace\033[0m           Pause / Play toggle"
-    echo -e "   \033[33m← / →\033[0m (or h/l)   Seek 5s backward / forward"
-    echo -e "   \033[33m↓ / ↑\033[0m           Seek 1m backward / forward"
-    echo -e "   \033[33m9 / 0\033[0m (or -/+)   Volume down / up"
-    echo -e "   \033[33m< / >\033[0m           Previous / Next track"
-    echo -e "   \033[33mSuper+Shift+a\033[0m   Toggle window on/off (Audio keeps playing!)"
-    echo -e "   \033[33mq\033[0m               Stop track & return to list"
-    echo -e "\033[0;90m─────────────────────────────────────────────────────────────────\033[0m"
-    echo ""
-}
+class MpvController:
+    def __init__(self, sock_path):
+        self.sock_path = sock_path
+        self.proc = None
+        self._ensure_server()
 
-play_tracks() {
-    local tracks=("$@")
-    if [ ${#tracks[@]} -eq 0 ]; then
-        return
-    fi
-    show_banner
-    mpv --no-video \
-        --term-osd-bar \
-        --term-osd-bar-chars="━━╸━" \
-        --input-default-bindings=yes \
-        --input-terminal=yes \
-        "${tracks[@]}"
-}
+    def _ensure_server(self):
+        # Check if existing server socket is responsive
+        if os.path.exists(self.sock_path):
+            try:
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.settimeout(0.3)
+                s.connect(self.sock_path)
+                s.sendall(b'{"command": ["get_property", "pause"]}\n')
+                resp = s.recv(1024)
+                s.close()
+                if resp:
+                    return
+            except Exception:
+                pass
+            try:
+                os.remove(self.sock_path)
+            except OSError:
+                pass
 
-while true; do
-    FILES=()
-    while IFS= read -r -d '' file; do
-        FILES+=("$file")
-    done < <(find "$MUSIC_DIR" -type f \( -iname "*.flac" -o -iname "*.mp3" -o -iname "*.m4a" -o -iname "*.ogg" -o -iname "*.wav" -o -iname "*.opus" -o -iname "*.aac" \) -print0 2>/dev/null | sort -z)
+        # Spawn background mpv process
+        self.proc = subprocess.Popen(
+            [
+                "mpv",
+                "--idle",
+                "--no-video",
+                f"--input-ipc-server={self.sock_path}",
+                "--volume=100",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for _ in range(25):
+            if os.path.exists(self.sock_path):
+                break
+            time.sleep(0.04)
 
-    if [ ${#FILES[@]} -eq 0 ]; then
-        clear
-        echo -e "\033[1;33mNo audio files found in ~/Music\033[0m"
-        echo "Place your audio tracks (.flac, .mp3, .wav, .m4a) in ~/Music."
-        echo ""
-        read -rp "Press Enter to exit..."
-        exit 0
-    fi
+    def send_cmd(self, command_list):
+        if not os.path.exists(self.sock_path):
+            self._ensure_server()
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(0.2)
+            s.connect(self.sock_path)
+            payload = json.dumps({"command": command_list}) + "\n"
+            s.sendall(payload.encode("utf-8"))
+            resp_raw = b""
+            while True:
+                chunk = s.recv(2048)
+                if not chunk:
+                    break
+                resp_raw += chunk
+                if b"\n" in chunk:
+                    break
+            s.close()
+            if resp_raw:
+                return json.loads(resp_raw.decode("utf-8", errors="ignore"))
+        except Exception:
+            pass
+        return None
 
-    HEADER="[Enter: Play] [Tab: Select Multiple] [Ctrl+A: Play All] [Esc: Hide Window]"
+    def play(self, filepath):
+        self.send_cmd(["loadfile", filepath, "replace"])
+        self.send_cmd(["set_property", "pause", False])
 
-    CHOSEN=$(printf "%s\n" "${FILES[@]}" | sed "s|^$MUSIC_DIR/||" | fzf \
-        --multi \
-        --prompt="󰎆 Select Track > " \
-        --header="$HEADER" \
-        --border=none \
-        --bind="ctrl-a:select-all" \
-        --preview="ffprobe -hide_banner '$MUSIC_DIR/{}' 2>&1 | grep -iE 'artist|title|album|date|duration' | head -n 6" \
-        --preview-window=right:45%:wrap)
+    def toggle_pause(self):
+        self.send_cmd(["cycle", "pause"])
 
-    if [ -z "$CHOSEN" ]; then
-        # User pressed Esc in fzf: hide window to scratchpad
-        if command -v swaymsg >/dev/null 2>&1; then
-            swaymsg '[app_id="tui-music"] move scratchpad' >/dev/null 2>&1 || exit 0
-            # Wait until window is recalled
-            sleep 1
+    def stop(self):
+        self.send_cmd(["stop"])
+
+    def seek(self, seconds):
+        self.send_cmd(["seek", seconds, "relative"])
+
+    def adjust_volume(self, delta):
+        vol = self.get_property("volume") or 100
+        new_vol = max(0, min(100, int(vol + delta)))
+        self.send_cmd(["set_property", "volume", new_vol])
+        return new_vol
+
+    def get_property(self, prop_name):
+        res = self.send_cmd(["get_property", prop_name])
+        if res and res.get("error") == "success":
+            return res.get("data")
+        return None
+
+    def quit(self):
+        try:
+            self.send_cmd(["quit"])
+        except Exception:
+            pass
+        if self.proc:
+            try:
+                self.proc.terminate()
+            except Exception:
+                pass
+
+
+def scan_music_library(music_dir):
+    tracks = []
+    if not os.path.isdir(music_dir):
+        return tracks
+
+    for root, _, files in os.walk(music_dir):
+        for f in sorted(files):
+            ext = os.path.splitext(f)[1].lower()
+            if ext in SUPPORTED_EXTS:
+                full_path = os.path.join(root, f)
+                rel_path = os.path.relpath(full_path, music_dir)
+                tracks.append({
+                    "path": full_path,
+                    "rel_path": rel_path,
+                    "filename": f,
+                    "title": os.path.splitext(f)[0],
+                    "artist": "",
+                    "duration": 0,
+                })
+
+    # Fast probe metadata
+    for t in tracks:
+        try:
+            cmd = ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", t["path"]]
+            raw = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+            d = json.loads(raw.decode("utf-8", errors="ignore")).get("format", {})
+            tags = d.get("tags", {})
+            title = tags.get("title") or tags.get("TITLE")
+            artist = tags.get("artist") or tags.get("ARTIST")
+            duration = float(d.get("duration", 0))
+            if title:
+                t["title"] = title
+            if artist:
+                t["artist"] = artist
+            t["duration"] = int(duration)
+        except Exception:
+            pass
+
+    return tracks
+
+
+def format_time(seconds):
+    if not seconds or seconds < 0:
+        return "00:00"
+    m = int(seconds) // 60
+    s = int(seconds) % 60
+    return f"{m:02d}:{s:02d}"
+
+
+def run_ui(stdscr):
+    try:
+        curses.curs_set(0)
+    except Exception:
+        pass
+    try:
+        curses.start_color()
+        curses.use_default_colors()
+    except Exception:
+        pass
+    stdscr.nodelay(True)
+    stdscr.timeout(100)  # Refresh every 100ms for smooth progress bar
+
+    # Setup color pairs safely
+    try:
+        curses.init_pair(1, curses.COLOR_CYAN, -1)     # Accent / Headers
+        curses.init_pair(2, curses.COLOR_GREEN, -1)    # Playing indicator
+        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLUE)  # Selected row
+        curses.init_pair(4, curses.COLOR_YELLOW, -1)   # Keybind accents
+        curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_CYAN)  # Status bar inverted
+    except Exception:
+        pass
+
+    mpv = MpvController(SOCKET_PATH)
+    tracks = scan_music_library(MUSIC_DIR)
+    
+    selected_idx = 0
+    current_playing_idx = -1
+    filter_query = ""
+    in_search_mode = False
+
+    while True:
+        # Filter tracks if search is active
+        if filter_query:
+            filtered_tracks = [
+                (i, t) for i, t in enumerate(tracks)
+                if filter_query.lower() in t["title"].lower() or filter_query.lower() in t["artist"].lower()
+            ]
+        else:
+            filtered_tracks = list(enumerate(tracks))
+
+        if selected_idx >= len(filtered_tracks):
+            selected_idx = max(0, len(filtered_tracks) - 1)
+
+        # Get playback status from MPV
+        pos = mpv.get_property("time-pos") or 0
+        dur = mpv.get_property("duration") or 0
+        is_paused = mpv.get_property("pause")
+        vol = mpv.get_property("volume") or 100
+        active_path = mpv.get_property("path")
+
+        # Auto-track active track index
+        if active_path:
+            for idx, t in enumerate(tracks):
+                if t["path"] == active_path:
+                    current_playing_idx = idx
+                    break
+        else:
+            if current_playing_idx != -1 and pos == 0 and dur == 0:
+                # Track ended, auto-play next track in library
+                next_idx = (current_playing_idx + 1) % len(tracks) if tracks else -1
+                if next_idx != -1 and len(tracks) > 1:
+                    current_playing_idx = next_idx
+                    mpv.play(tracks[next_idx]["path"])
+
+        # Render Screen
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+
+        # 1. Header
+        header_text = " 󰎆  TUI Music Player — ~/Music "
+        stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
+        stdscr.addstr(0, 0, header_text.ljust(w - 1)[:w - 1])
+        stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
+        stdscr.addstr(1, 0, ("─" * (w - 1))[:w - 1], curses.A_DIM)
+
+        # 2. Track List Area
+        list_h = max(1, h - 7)
+        scroll_offset = max(0, selected_idx - list_h + 1) if selected_idx >= list_h else 0
+
+        if not filtered_tracks:
+            stdscr.addstr(3, 2, "No tracks found matching query." if filter_query else "No music in ~/Music.", curses.A_DIM)
+        else:
+            for row in range(list_h):
+                idx = scroll_offset + row
+                if idx >= len(filtered_tracks):
+                    break
+                orig_idx, track = filtered_tracks[idx]
+                y = 2 + row
+
+                is_selected = (idx == selected_idx)
+                is_playing = (orig_idx == current_playing_idx)
+
+                # Icon
+                icon = "▶ " if (is_playing and not is_paused) else ("⏸ " if is_playing else "  ")
+                
+                # Display title & artist
+                display_name = f"{track['artist']} - {track['title']}" if track["artist"] else track["title"]
+                dur_str = format_time(track["duration"]) if track["duration"] else "--:--"
+
+                max_name_w = max(10, w - len(dur_str) - 8)
+                name_trimmed = display_name[:max_name_w].ljust(max_name_w)
+                line_str = f" {icon}{name_trimmed}  {dur_str} "
+
+                if is_selected:
+                    stdscr.attron(curses.color_pair(3) | curses.A_BOLD)
+                    stdscr.addstr(y, 0, line_str.ljust(w - 1)[:w - 1])
+                    stdscr.attroff(curses.color_pair(3) | curses.A_BOLD)
+                elif is_playing:
+                    stdscr.attron(curses.color_pair(2) | curses.A_BOLD)
+                    stdscr.addstr(y, 0, line_str[:w - 1])
+                    stdscr.attroff(curses.color_pair(2) | curses.A_BOLD)
+                else:
+                    stdscr.addstr(y, 0, line_str[:w - 1])
+
+        # 3. Bottom Player Bar
+        bar_y = h - 5
+        stdscr.addstr(bar_y, 0, ("─" * (w - 1))[:w - 1], curses.A_DIM)
+
+        # Status Line
+        if current_playing_idx != -1 and current_playing_idx < len(tracks):
+            cur = tracks[current_playing_idx]
+            cur_name = f"{cur['artist']} - {cur['title']}" if cur["artist"] else cur["title"]
+            status_tag = "⏸ PAUSED " if is_paused else "▶ PLAYING"
+            pos_str = f"{format_time(pos)} / {format_time(dur if dur else cur['duration'])}"
+            info_str = f" {status_tag}  {cur_name}   {pos_str}  (Vol: {int(vol)}%)"
+        else:
+            info_str = " ⏹ STOPPED — Select a track and press Enter to play"
+        stdscr.addstr(bar_y + 1, 0, info_str[:w - 1], curses.A_BOLD)
+
+        # Visual Progress Bar
+        bar_w = max(10, w - 4)
+        if dur and dur > 0:
+            filled_len = min(bar_w, int((pos / dur) * bar_w))
+        else:
+            filled_len = 0
+        progress_str = " [" + ("━" * filled_len) + "●" + ("─" * max(0, bar_w - filled_len - 1)) + "] "
+        stdscr.addstr(bar_y + 2, 0, progress_str[:w - 1], curses.color_pair(1))
+
+        # Bottom Shortcut Hints
+        if in_search_mode:
+            search_bar = f" Search: {filter_query}█  (Enter: confirm, Esc: clear)"
+            stdscr.attron(curses.color_pair(4) | curses.A_BOLD)
+            stdscr.addstr(bar_y + 3, 0, search_bar.ljust(w - 1)[:w - 1])
+            stdscr.attroff(curses.color_pair(4) | curses.A_BOLD)
+        else:
+            hints = " [j/k] Browse  [Enter] Play  [Space] Pause/Play  [h/l] Seek  [+/-] Vol  [/] Search  [q] Quit"
+            stdscr.addstr(bar_y + 3, 0, hints[:w - 1], curses.A_DIM)
+
+        stdscr.refresh()
+
+        # Handle Keyboard Input
+        try:
+            ch = stdscr.getch()
+        except Exception:
+            ch = -1
+
+        if ch == -1:
             continue
-        else
-            exit 0
-        fi
-    fi
 
-    SELECTED_TRACKS=()
-    while IFS= read -r line; do
-        if [ -n "$line" ]; then
-            SELECTED_TRACKS+=("$MUSIC_DIR/$line")
-        fi
-    done <<< "$CHOSEN"
+        # In search mode
+        if in_search_mode:
+            if ch in (10, 13):  # Enter
+                in_search_mode = False
+            elif ch == 27:      # Escape
+                filter_query = ""
+                in_search_mode = False
+            elif ch in (curses.KEY_BACKSPACE, 127, 8):
+                filter_query = filter_query[:-1]
+            elif 32 <= ch <= 126:
+                filter_query += chr(ch)
+            continue
 
-    play_tracks "${SELECTED_TRACKS[@]}"
-done
+        # Normal mode keys
+        if ch in (ord('q'), ord('Q')):
+            mpv.quit()
+            break
+        elif ch in (ord('j'), curses.KEY_DOWN):
+            if filtered_tracks:
+                selected_idx = min(len(filtered_tracks) - 1, selected_idx + 1)
+        elif ch in (ord('k'), curses.KEY_UP):
+            if filtered_tracks:
+                selected_idx = max(0, selected_idx - 1)
+        elif ch in (ord('g'), curses.KEY_HOME):
+            selected_idx = 0
+        elif ch in (ord('G'), curses.KEY_END):
+            if filtered_tracks:
+                selected_idx = len(filtered_tracks) - 1
+        elif ch in (10, 13):  # Enter -> Play selected track
+            if filtered_tracks and 0 <= selected_idx < len(filtered_tracks):
+                orig_idx, track = filtered_tracks[selected_idx]
+                current_playing_idx = orig_idx
+                mpv.play(track["path"])
+        elif ch == ord(' '):  # Space -> Pause / Resume
+            if current_playing_idx != -1:
+                mpv.toggle_pause()
+            elif filtered_tracks:
+                orig_idx, track = filtered_tracks[selected_idx]
+                current_playing_idx = orig_idx
+                mpv.play(track["path"])
+        elif ch in (ord('h'), curses.KEY_LEFT):
+            mpv.seek(-5)
+        elif ch in (ord('l'), curses.KEY_RIGHT):
+            mpv.seek(5)
+        elif ch in (ord('='), ord('+'), ord('0')):
+            mpv.adjust_volume(5)
+        elif ch in (ord('-'), ord('9')):
+            mpv.adjust_volume(-5)
+        elif ch == ord('/'):
+            in_search_mode = True
+            filter_query = ""
+        elif ch == 27:  # Esc -> Clear filter or hide
+            if filter_query:
+                filter_query = ""
+            else:
+                subprocess.run(["swaymsg", "[app_id=\"tui-music\"] move scratchpad"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def main():
+    try:
+        curses.wrapper(run_ui)
+    except KeyboardInterrupt:
+        pass
+
+if __name__ == "__main__":
+    main()
