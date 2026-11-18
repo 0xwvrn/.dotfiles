@@ -135,14 +135,19 @@
 - `Ctrl + z` : Reset subtitle delay to 0.
 
 ### cmus TUI Audio Player (Scratchpad):
-- `Super / Alt + Shift + a` : **Toggle window on / off** (audio continues playing uninterrupted in background).
-- `Enter` : Play selected track.
+- `Super / Alt + Shift + a` : **Toggle window on / off** (audio continues in background).
+- `1` : **All Songs View** (clean sorted list of every track).
+- `2` : **Artist Specific View** (browse by artist to play/shuffle only their tracks).
+- `Tab` : Switch between Artist list and Track list (in Artist View).
+- `s` : **Toggle Shuffle** (on / off).
+- `a` : **Toggle Artist Scope** (`aaa_mode`: all library vs current artist only).
 - `Space` : Toggle Play / Pause.
-- `j / k` : Browse up / down through library (always accessible, even during active playback).
+- `Enter` : Play selected track.
+- `j / k` : Browse up / down through tracks or artists.
 - `b / z` : Next / Previous track.
 - `+ / -` : Volume up / down.
 - `h / l` (or `← / →`) : Seek 5s backward / forward.
 - `/` : Search library (`n` for next match).
-- `r` : Rescan `~/Music` library (auto-adds any newly downloaded songs).
+- `r` : Rescan `~/Music` library for new songs.
 - `R` : Update track metadata cache.
 - `q` : Quit cmus.
