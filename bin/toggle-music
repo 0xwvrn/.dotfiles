@@ -1,8 +1,57 @@
-#!/usr/bin/env bash
-# ~/.local/bin/toggle-music: Toggle instant floating cmus player scratchpad in Sway
+#!/usr/bin/env python3
+# ~/.local/bin/toggle-music: Instant floating cmus player scratchpad toggle in Sway
 
-if ! swaymsg '[app_id="tui-music"] scratchpad show' >/dev/null 2>&1; then
-    kitty --app-id tui-music -e cmus &
-    sleep 0.18
-    swaymsg '[app_id="tui-music"] scratchpad show' >/dev/null 2>&1 || true
-fi
+import json
+import os
+import subprocess
+import sys
+import time
+
+APP_ID = "tui-music"
+
+def get_node():
+    try:
+        raw = subprocess.check_output(["swaymsg", "-t", "get_tree"], stderr=subprocess.DEVNULL)
+        tree = json.loads(raw)
+    except Exception:
+        return None
+    node = None
+    def walk(n):
+        nonlocal node
+        if n.get("app_id") == APP_ID:
+            node = n
+            return
+        for k in ("nodes", "floating_nodes"):
+            for c in n.get(k, []):
+                walk(c)
+    walk(tree)
+    return node
+
+node = get_node()
+
+if not node:
+    # Spawn cmus in centered floating card with 12px padding
+    subprocess.Popen([
+        "kitty",
+        f"--app-id={APP_ID}",
+        "-o", "window_padding_width=12",
+        "-o", "remember_window_size=no",
+        "-o", "initial_window_width=840",
+        "-o", "initial_window_height=480",
+        "-e", "cmus"
+    ])
+    for _ in range(25):
+        time.sleep(0.04)
+        res = subprocess.run(
+            ["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 840 480, move position center, border pixel 2'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        if res.returncode == 0:
+            break
+elif node.get("visible") and node.get("focused"):
+    # Currently on screen and focused: hide it into scratchpad
+    subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] move scratchpad'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+else:
+    # In scratchpad or unfocused: bring to front, focus, and ensure centered geometry
+    subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 840 480, move position center, focus'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

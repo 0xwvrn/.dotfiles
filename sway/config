@@ -228,7 +228,7 @@ bindgesture swipe:3:left workspace next
     for_window [app_id="floating-fm"] floating enable, resize set 1000 620, move position center
     for_window [app_id="floating-help"] floating enable, resize set 1050 660, move position center
     for_window [app_id="tui-monitor"] floating enable, resize set 1000 620, move position center
-    for_window [app_id="tui-music"] floating enable, resize set 950 580, move position center, move scratchpad
+    for_window [app_id="tui-music"] floating enable, resize set 840 480, move position center, border pixel 2, move scratchpad
     # Automatically route Apple Music in Zen to workspace 3
     for_window [app_id="zen" title=".*Apple.*Music.*"] move container to workspace number 3
     # You can "split" the current object of your focus with
@@ -380,10 +380,10 @@ bindsym $super+r mode "resize"
     bindsym $mod+Shift+s exec kitty --app-id tui-settings -e ~/.local/bin/settings
     bindsym $super+Shift+s exec kitty --app-id tui-settings -e ~/.local/bin/settings
 
-# Window colors (borderless)
+# Window colors
 # class                 border      bground     text        indicator   child_border
-client.focused          $background $background $foreground $background $background
-client.focused_inactive $background $background $foreground $background $background
+client.focused          $color6     $background $foreground $color6     $color6
+client.focused_inactive $color4     $background $foreground $color4     $color4
 client.unfocused        $background $background $foreground $background $background
 client.urgent           $color1     $color1     $foreground $color1     $color1
 client.placeholder      $background $background $foreground $background $background
