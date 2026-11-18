@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-tui-music-player: A lightweight, Vim-first terminal music player powered by mpv IPC.
-- Allows browsing the library with j/k while music is playing.
-- Instant single-tap playback, volume, and seeking controls.
-- Runs smoothly inside a floating Sway scratchpad window.
+tui-music-player: Ultra-clean, minimal terminal music player powered by mpv IPC.
+- Shows the music list immediately upon opening.
+- Both Enter and Space play the selected track (Space also pauses/resumes active track).
+- j / k navigates smoothly through the library while music is playing.
+- Zero control hints on screen.
+- Runs inside a floating Sway scratchpad window (Super+Shift+a to toggle on/off).
 """
 
 import curses
@@ -25,11 +27,10 @@ class MpvController:
         self._ensure_server()
 
     def _ensure_server(self):
-        # Check if existing server socket is responsive
         if os.path.exists(self.sock_path):
             try:
                 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                s.settimeout(0.3)
+                s.settimeout(0.2)
                 s.connect(self.sock_path)
                 s.sendall(b'{"command": ["get_property", "pause"]}\n')
                 resp = s.recv(1024)
@@ -43,7 +44,6 @@ class MpvController:
             except OSError:
                 pass
 
-        # Spawn background mpv process
         self.proc = subprocess.Popen(
             [
                 "mpv",
@@ -181,28 +181,26 @@ def run_ui(stdscr):
     except Exception:
         pass
     stdscr.nodelay(True)
-    stdscr.timeout(100)  # Refresh every 100ms for smooth progress bar
+    stdscr.timeout(100)  # Smooth 100ms refresh
 
-    # Setup color pairs safely
     try:
-        curses.init_pair(1, curses.COLOR_CYAN, -1)     # Accent / Headers
-        curses.init_pair(2, curses.COLOR_GREEN, -1)    # Playing indicator
-        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLUE)  # Selected row
-        curses.init_pair(4, curses.COLOR_YELLOW, -1)   # Keybind accents
-        curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_CYAN)  # Status bar inverted
+        curses.init_pair(1, curses.COLOR_CYAN, -1)     # Accent
+        curses.init_pair(2, curses.COLOR_GREEN, -1)    # Playing track
+        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLUE)  # Highlighted selection cursor
+        curses.init_pair(4, curses.COLOR_YELLOW, -1)   # Search prompt
     except Exception:
         pass
 
     mpv = MpvController(SOCKET_PATH)
     tracks = scan_music_library(MUSIC_DIR)
-    
+
     selected_idx = 0
     current_playing_idx = -1
     filter_query = ""
     in_search_mode = False
 
     while True:
-        # Filter tracks if search is active
+        # Search filtering
         if filter_query:
             filtered_tracks = [
                 (i, t) for i, t in enumerate(tracks)
@@ -214,14 +212,13 @@ def run_ui(stdscr):
         if selected_idx >= len(filtered_tracks):
             selected_idx = max(0, len(filtered_tracks) - 1)
 
-        # Get playback status from MPV
+        # Sync state from background MPV
         pos = mpv.get_property("time-pos") or 0
         dur = mpv.get_property("duration") or 0
         is_paused = mpv.get_property("pause")
         vol = mpv.get_property("volume") or 100
         active_path = mpv.get_property("path")
 
-        # Auto-track active track index
         if active_path:
             for idx, t in enumerate(tracks):
                 if t["path"] == active_path:
@@ -229,46 +226,36 @@ def run_ui(stdscr):
                     break
         else:
             if current_playing_idx != -1 and pos == 0 and dur == 0:
-                # Track ended, auto-play next track in library
                 next_idx = (current_playing_idx + 1) % len(tracks) if tracks else -1
                 if next_idx != -1 and len(tracks) > 1:
                     current_playing_idx = next_idx
                     mpv.play(tracks[next_idx]["path"])
 
-        # Render Screen
+        # Render Interface
         stdscr.erase()
         h, w = stdscr.getmaxyx()
 
-        # 1. Header
-        header_text = " 󰎆  TUI Music Player — ~/Music "
-        stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(0, 0, header_text.ljust(w - 1)[:w - 1])
-        stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(1, 0, ("─" * (w - 1))[:w - 1], curses.A_DIM)
-
-        # 2. Track List Area
-        list_h = max(1, h - 7)
+        # Reserve bottom 3 lines for Now Playing bar
+        list_h = max(1, h - 3)
         scroll_offset = max(0, selected_idx - list_h + 1) if selected_idx >= list_h else 0
 
+        # Render Music List directly from line 0
         if not filtered_tracks:
-            stdscr.addstr(3, 2, "No tracks found matching query." if filter_query else "No music in ~/Music.", curses.A_DIM)
+            stdscr.addstr(1, 2, "No tracks found." if filter_query else "No music in ~/Music.", curses.A_DIM)
         else:
             for row in range(list_h):
                 idx = scroll_offset + row
                 if idx >= len(filtered_tracks):
                     break
                 orig_idx, track = filtered_tracks[idx]
-                y = 2 + row
+                y = row
 
                 is_selected = (idx == selected_idx)
                 is_playing = (orig_idx == current_playing_idx)
 
-                # Icon
                 icon = "▶ " if (is_playing and not is_paused) else ("⏸ " if is_playing else "  ")
-                
-                # Display title & artist
                 display_name = f"{track['artist']} - {track['title']}" if track["artist"] else track["title"]
-                dur_str = format_time(track["duration"]) if track["duration"] else "--:--"
+                dur_str = format_time(track["duration"]) if track["duration"] else ""
 
                 max_name_w = max(10, w - len(dur_str) - 8)
                 name_trimmed = display_name[:max_name_w].ljust(max_name_w)
@@ -285,43 +272,39 @@ def run_ui(stdscr):
                 else:
                     stdscr.addstr(y, 0, line_str[:w - 1])
 
-        # 3. Bottom Player Bar
-        bar_y = h - 5
-        stdscr.addstr(bar_y, 0, ("─" * (w - 1))[:w - 1], curses.A_DIM)
+        # Bottom Minimal Now Playing Bar
+        sep_y = h - 3
+        stdscr.addstr(sep_y, 0, ("─" * (w - 1))[:w - 1], curses.A_DIM)
 
-        # Status Line
         if current_playing_idx != -1 and current_playing_idx < len(tracks):
             cur = tracks[current_playing_idx]
             cur_name = f"{cur['artist']} - {cur['title']}" if cur["artist"] else cur["title"]
-            status_tag = "⏸ PAUSED " if is_paused else "▶ PLAYING"
-            pos_str = f"{format_time(pos)} / {format_time(dur if dur else cur['duration'])}"
-            info_str = f" {status_tag}  {cur_name}   {pos_str}  (Vol: {int(vol)}%)"
+            tag = "⏸" if is_paused else "▶"
+            time_info = f"{format_time(pos)} / {format_time(dur if dur else cur['duration'])}"
+            info_line = f" {tag} {cur_name}   {time_info}"
         else:
-            info_str = " ⏹ STOPPED — Select a track and press Enter to play"
-        stdscr.addstr(bar_y + 1, 0, info_str[:w - 1], curses.A_BOLD)
+            info_line = " ⏹ Stopped"
+        stdscr.addstr(sep_y + 1, 0, info_line[:w - 1], curses.A_BOLD)
 
-        # Visual Progress Bar
+        # Minimal Progress Line
         bar_w = max(10, w - 4)
         if dur and dur > 0:
             filled_len = min(bar_w, int((pos / dur) * bar_w))
         else:
             filled_len = 0
         progress_str = " [" + ("━" * filled_len) + "●" + ("─" * max(0, bar_w - filled_len - 1)) + "] "
-        stdscr.addstr(bar_y + 2, 0, progress_str[:w - 1], curses.color_pair(1))
+        stdscr.addstr(sep_y + 2, 0, progress_str[:w - 1], curses.color_pair(1))
 
-        # Bottom Shortcut Hints
+        # Search overlay (only shown when user actively types '/')
         if in_search_mode:
-            search_bar = f" Search: {filter_query}█  (Enter: confirm, Esc: clear)"
+            search_bar = f" /{filter_query}█ "
             stdscr.attron(curses.color_pair(4) | curses.A_BOLD)
-            stdscr.addstr(bar_y + 3, 0, search_bar.ljust(w - 1)[:w - 1])
+            stdscr.addstr(sep_y + 1, 0, search_bar.ljust(w - 1)[:w - 1])
             stdscr.attroff(curses.color_pair(4) | curses.A_BOLD)
-        else:
-            hints = " [j/k] Browse  [Enter] Play  [Space] Pause/Play  [h/l] Seek  [+/-] Vol  [/] Search  [q] Quit"
-            stdscr.addstr(bar_y + 3, 0, hints[:w - 1], curses.A_DIM)
 
         stdscr.refresh()
 
-        # Handle Keyboard Input
+        # Key Input Handling
         try:
             ch = stdscr.getch()
         except Exception:
@@ -330,11 +313,10 @@ def run_ui(stdscr):
         if ch == -1:
             continue
 
-        # In search mode
         if in_search_mode:
             if ch in (10, 13):  # Enter
                 in_search_mode = False
-            elif ch == 27:      # Escape
+            elif ch == 27:      # Esc
                 filter_query = ""
                 in_search_mode = False
             elif ch in (curses.KEY_BACKSPACE, 127, 8):
@@ -343,7 +325,7 @@ def run_ui(stdscr):
                 filter_query += chr(ch)
             continue
 
-        # Normal mode keys
+        # Single-tap controls
         if ch in (ord('q'), ord('Q')):
             mpv.quit()
             break
@@ -358,18 +340,16 @@ def run_ui(stdscr):
         elif ch in (ord('G'), curses.KEY_END):
             if filtered_tracks:
                 selected_idx = len(filtered_tracks) - 1
-        elif ch in (10, 13):  # Enter -> Play selected track
+        elif ch in (10, 13, ord(' ')):  # Enter OR Space to play!
             if filtered_tracks and 0 <= selected_idx < len(filtered_tracks):
                 orig_idx, track = filtered_tracks[selected_idx]
-                current_playing_idx = orig_idx
-                mpv.play(track["path"])
-        elif ch == ord(' '):  # Space -> Pause / Resume
-            if current_playing_idx != -1:
-                mpv.toggle_pause()
-            elif filtered_tracks:
-                orig_idx, track = filtered_tracks[selected_idx]
-                current_playing_idx = orig_idx
-                mpv.play(track["path"])
+                if ch == ord(' ') and orig_idx == current_playing_idx:
+                    # Space on currently playing track toggles pause
+                    mpv.toggle_pause()
+                else:
+                    # Enter or Space on any track plays it immediately
+                    current_playing_idx = orig_idx
+                    mpv.play(track["path"])
         elif ch in (ord('h'), curses.KEY_LEFT):
             mpv.seek(-5)
         elif ch in (ord('l'), curses.KEY_RIGHT):
@@ -381,11 +361,8 @@ def run_ui(stdscr):
         elif ch == ord('/'):
             in_search_mode = True
             filter_query = ""
-        elif ch == 27:  # Esc -> Clear filter or hide
-            if filter_query:
-                filter_query = ""
-            else:
-                subprocess.run(["swaymsg", "[app_id=\"tui-music\"] move scratchpad"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif ch == 27:  # Esc -> Hide to scratchpad
+            subprocess.run(["swaymsg", "[app_id=\"tui-music\"] move scratchpad"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def main():
