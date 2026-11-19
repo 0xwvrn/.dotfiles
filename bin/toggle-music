@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ~/.local/bin/toggle-music: Instant floating player scratchpad toggle in Sway
+# ~/.local/bin/toggle-music: Toggle instant floating Termusic scratchpad in Sway
 
 import json
 import os
@@ -30,21 +30,20 @@ def get_node():
 node = get_node()
 
 if not node:
-    # Spawn in centered floating card with 12px padding
-    music_player = os.path.expanduser("~/.local/bin/tui-music-player")
+    # Spawn termusic in centered floating card with 8px padding
     subprocess.Popen([
         "kitty",
         f"--app-id={APP_ID}",
-        "-o", "window_padding_width=12",
+        "-o", "window_padding_width=8",
         "-o", "remember_window_size=no",
-        "-o", "initial_window_width=840",
-        "-o", "initial_window_height=480",
-        "-e", music_player
+        "-o", "initial_window_width=920",
+        "-o", "initial_window_height=540",
+        "-e", "termusic", "--disable-cover", "/home/wvrn/Music"
     ])
     for _ in range(25):
         time.sleep(0.04)
         res = subprocess.run(
-            ["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 840 480, move position center, border pixel 2'],
+            ["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 920 540, move position center, border pixel 2'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -55,4 +54,4 @@ elif node.get("visible") and node.get("focused"):
     subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] move scratchpad'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 else:
     # In scratchpad or unfocused: bring to front, focus, ensure centered geometry
-    subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 840 480, move position center, focus'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 920 540, move position center, focus'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

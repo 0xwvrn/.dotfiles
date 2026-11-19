@@ -134,21 +134,20 @@
 - `Z` (`Shift + z`) : Delay subtitles forward (+100ms).
 - `Ctrl + z` : Reset subtitle delay to 0.
 
-### cmus TUI Audio Player (Scratchpad):
-- `Super / Alt + Shift + a` : **Toggle window on / off** (audio continues in background).
-- `1` : **All Songs View** (clean sorted list of every track).
-- `2` : **Artist Specific View** (browse by artist to play/shuffle only their tracks).
-- `Tab` : Switch between Artist list and Track list (in Artist View).
-- `s` : **Sort Music Menu** (prompt sort options: title, artist, album, date, duration, play_count).
-- `S` (`Shift + s`) : **Toggle Shuffle** (on / off).
-- `a` : **Toggle Artist Scope** (`aaa_mode`: all library vs current artist only).
+### Termusic TUI Audio Player (Scratchpad):
+- `Super / Alt + Shift + a` : **Toggle window on / off** (audio continues running in background).
+- `1` : **Library View** (file system / track explorer).
+- `2` : **Database View** (browse tracks by artist, album, genre).
+- `3` : **Podcast View**.
 - `Space` : Toggle Play / Pause.
-- `Enter` : Play selected track.
-- `j / k` : Browse up / down through tracks or artists.
-- `b / z` : Next / Previous track.
+- `Enter` : Play selected track / load item.
+- `j / k` : Navigate down / up.
+- `h / l` : Collapse / Expand folder or move left / right.
+- `g / G` (`Shift + g`) : Jump to top / bottom of current list.
+- `n / N` (`Shift + n`) : Next / Previous track.
 - `+ / -` : Volume up / down.
-- `h / l` (or `← / →`) : Seek 5s backward / forward.
-- `/` : Search library (`n` for next match).
-- `r` : Rescan `~/Music` library for new songs.
-- `R` : Update track metadata cache.
-- `q` : Quit cmus.
+- `f / b` : Seek forward / backward 5s.
+- `s` (in playlist): **Shuffle Playlist**.
+- `m` (in playlist): Cycle loop / repeat modes.
+- `/` : Search library or playlist.
+- `q` : Quit Termusic.
