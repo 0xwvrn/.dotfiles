@@ -55,15 +55,19 @@ if not node:
         "-o", "initial_window_height=540",
         "-e", "termusic", "--disable-cover", "/home/wvrn/Music"
     ])
-    for _ in range(25):
-        time.sleep(0.04)
-        res = subprocess.run(
-            ["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 920 540, move position center, border pixel 2'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        if res.returncode == 0:
-            break
+    for _ in range(30):
+        time.sleep(0.06)
+        n = get_node()
+        if n:
+            subprocess.run(
+                ["swaymsg", f'[app_id="{APP_ID}"] scratchpad show, resize set 920 540, move position center, focus'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            time.sleep(0.04)
+            n = get_node()
+            if n and n.get("visible"):
+                break
 elif node.get("visible") and node.get("focused"):
     # Currently on screen and focused: hide it into scratchpad
     subprocess.run(["swaymsg", f'[app_id="{APP_ID}"] move scratchpad'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
