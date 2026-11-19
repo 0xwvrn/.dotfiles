@@ -30,7 +30,7 @@ def get_node():
 node = get_node()
 
 if not node:
-    # Ensure playlist.log is seeded with library tracks if empty
+    # Ensure playlist.log is seeded with library tracks if empty, and deduplicated
     playlist_log = os.path.expanduser("~/.config/termusic/playlist.log")
     if not os.path.exists(playlist_log) or os.path.getsize(playlist_log) == 0:
         music_dir = os.path.expanduser("~/Music")
@@ -44,6 +44,24 @@ if not node:
             os.makedirs(os.path.dirname(playlist_log), exist_ok=True)
             with open(playlist_log, "w", encoding="utf-8") as fp:
                 fp.write("0\n" + "\n".join(tracks) + "\n")
+    else:
+        try:
+            with open(playlist_log, "r", encoding="utf-8") as fp:
+                lines = fp.read().splitlines()
+            if len(lines) > 1:
+                cur_idx = lines[0]
+                seen = set()
+                deduped = []
+                for p in lines[1:]:
+                    p_str = p.strip()
+                    if p_str and p_str not in seen:
+                        seen.add(p_str)
+                        deduped.append(p_str)
+                if len(deduped) != len(lines[1:]):
+                    with open(playlist_log, "w", encoding="utf-8") as fp:
+                        fp.write(f"{cur_idx}\n" + "\n".join(deduped) + "\n")
+        except Exception:
+            pass
 
     # Spawn termusic in centered floating card with 8px padding
     subprocess.Popen([
