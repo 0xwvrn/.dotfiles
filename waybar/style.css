@@ -52,7 +52,7 @@ window#waybar {
     color: @foreground;
 }
 
-#clock, #battery, #cpu, #memory, #network, #pulseaudio, #tray, #mode, #idle_inhibitor {
+#clock, #battery, #cpu, #memory, #network, #custom-vpn, #pulseaudio, #tray, #mode, #idle_inhibitor {
     padding: 0 8px;
     margin: 0 4px;
 }
@@ -94,6 +94,11 @@ window#waybar {
 
 #network {
     color: @color4;
+}
+
+#custom-vpn {
+    color: @color3;
+    font-weight: 800;
 }
 
 #network.disconnected {

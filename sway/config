@@ -228,6 +228,7 @@ bindgesture swipe:3:left workspace next
     for_window [app_id="floating-fm"] floating enable, resize set 1000 620, move position center
     for_window [app_id="floating-help"] floating enable, resize set 1050 660, move position center
     for_window [app_id="tui-monitor"] floating enable, resize set 1000 620, move position center
+    for_window [app_id="tui-battery"] floating enable, resize set 780 440, move position center
     for_window [app_id="tui-music"] floating enable, resize set 920 540, move position center, border pixel 2, move scratchpad
     # Automatically route Apple Music in Zen to workspace 3
     for_window [app_id="zen" title=".*Apple.*Music.*"] move container to workspace number 3

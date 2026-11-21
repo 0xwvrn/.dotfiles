@@ -122,6 +122,8 @@ alias ga='git add'
 alias lg='lazygit'
 alias md='glow'
 alias du='gdu'
+alias top='btm'
+alias sys='fastfetch'
 
 # Modern coreutils (eza & bat)
 if command -v eza >/dev/null 2>&1; then

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+case "$1" in
+    serial)
+        cmus-remote -C "set shuffle=off"
+        cmus-remote -C "win-activate"
+        ;;
+    shuffle)
+        cmus-remote -C "set shuffle=tracks"
+        cmus-remote -C "reshuffle"
+        cmus-remote -C "win-activate"
+        ;;
+esac

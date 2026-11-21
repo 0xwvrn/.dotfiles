@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Check active Proton VPN connection via NetworkManager
+cc=$(nmcli -t -f NAME connection show --active 2>/dev/null | grep -oP '^ProtonVPN \K[A-Z]{2}' | head -n 1)
+
+# Fallback to protonvpn CLI status if nmcli didn't match
+if [ -z "$cc" ] && command -v protonvpn >/dev/null 2>&1; then
+    status=$(protonvpn status 2>/dev/null)
+    if echo "$status" | grep -q "Status: Connected"; then
+        cc=$(echo "$status" | grep -oP 'Server:\s*\K[A-Z]{2}')
+    fi
+fi
+
+if [ -n "$cc" ]; then
+    printf '{"text": "%s", "tooltip": "Proton VPN: Connected (%s)", "class": "connected"}\n' "$cc" "$cc"
+else
+    printf '{"text": "", "tooltip": "Proton VPN: Disconnected", "class": "disconnected"}\n'
+fi

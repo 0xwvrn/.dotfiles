@@ -103,11 +103,24 @@ configuration {
       delay:  0;
     }
 
-	/*---------- Keybindings ----------*/
-	kb-row-down: "Down,Control+n,Control+j";
-	kb-row-up: "Up,Control+p,Control+k";
+	/*---------- Keybindings (Vim Controls) ----------*/
+	kb-row-down: "Down,Control+j,Control+n,Alt+j";
+	kb-row-up: "Up,Control+k,Control+p,Shift+Tab,Shift+ISO_Left_Tab,Alt+k";
+	kb-row-left: "Control+h,Alt+h";
+	kb-row-right: "Control+l,Alt+l";
+	kb-page-prev: "Page_Up,Control+u,Alt+u";
+	kb-page-next: "Page_Down,Control+d,Alt+d";
+	kb-row-first: "Home,KP_Home";
+	kb-row-last: "End,KP_End";
 	kb-accept-entry: "Control+m,Return,KP_Enter";
+	kb-cancel: "Escape,Control+g,Control+bracketleft";
+
+	/* Unbind conflicting defaults to enable Vim keys */
 	kb-remove-to-eol: "";
+	kb-remove-to-sol: "";
+	kb-remove-char-forward: "Delete";
+	kb-remove-char-back: "BackSpace,Shift+BackSpace";
+	kb-mode-complete: "";
 /*
 	kb-primary-paste: "Control+V,Shift+Insert";
 	kb-secondary-paste: "Control+v,Insert";

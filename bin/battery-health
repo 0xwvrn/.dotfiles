@@ -1,0 +1,295 @@
+#!/usr/bin/env python3
+"""
+Interactive Battery Health TUI for Linux / ThinkPad
+Reads directly from /sys/class/power_supply/
+"""
+
+import os
+import sys
+import time
+import curses
+
+def read_battery_data():
+    base = '/sys/class/power_supply/BAT0'
+    if not os.path.exists(base):
+        # Fallback to any battery
+        bats = [os.path.join('/sys/class/power_supply', b) for b in os.listdir('/sys/class/power_supply') if b.startswith('BAT')]
+        if not bats:
+            return None
+        base = bats[0]
+
+    def r(f, default=''):
+        p = os.path.join(base, f)
+        if os.path.exists(p):
+            try:
+                with open(p, 'r') as fp:
+                    return fp.read().strip()
+            except OSError:
+                pass
+        return default
+
+    def r_int(f, default=0):
+        try:
+            return int(r(f, default))
+        except (ValueError, TypeError):
+            return default
+
+    # Energy in Wh (from uWh) or Charge in Ah
+    now_wh = r_int('energy_now') / 1e6
+    full_wh = r_int('energy_full') / 1e6
+    design_wh = r_int('energy_full_design') / 1e6
+
+    # Some systems use charge_now in uAh instead of energy_now
+    if design_wh == 0:
+        now_wh = r_int('charge_now') / 1e6
+        full_wh = r_int('charge_full') / 1e6
+        design_wh = r_int('charge_full_design') / 1e6
+
+    power_w = r_int('power_now') / 1e6
+    if power_w == 0:
+        current_a = r_int('current_now') / 1e6
+        volt_v = r_int('voltage_now') / 1e6
+        power_w = current_a * volt_v
+
+    voltage_v = r_int('voltage_now') / 1e6
+    design_v = r_int('voltage_min_design') / 1e6
+    cycles = r_int('cycle_count')
+    status = r('status', 'Unknown')
+    capacity = r_int('capacity')
+    health = (full_wh / design_wh * 100) if design_wh > 0 else 0
+    wear = max(0.0, 100.0 - health)
+
+    # Estimate remaining time
+    time_str = 'Calculating...'
+    if status == 'Discharging' and power_w > 0:
+        hrs = now_wh / power_w
+        h = int(hrs)
+        m = int((hrs - h) * 60)
+        time_str = f"{h}h {m:02d}m remaining"
+    elif status == 'Charging' and power_w > 0:
+        rem_wh = max(0, full_wh - now_wh)
+        hrs = rem_wh / power_w
+        h = int(hrs)
+        m = int((hrs - h) * 60)
+        time_str = f"{h}h {m:02d}m to full"
+    elif status == 'Full':
+        time_str = "Fully Charged"
+    elif status == 'Not charging':
+        time_str = "Connected (Not Charging)"
+
+    # Health assessment
+    if health >= 80:
+        condition = "Excellent"
+        cond_color = "green"
+    elif health >= 60:
+        condition = "Good"
+        cond_color = "green"
+    elif health >= 45:
+        condition = "Fair (Normal Ageing)"
+        cond_color = "yellow"
+    else:
+        condition = "Degraded (Replacement Recommended)"
+        cond_color = "red"
+
+    start_t = r('charge_control_start_threshold', '') or r('charge_start_threshold', 'N/A')
+    stop_t = r('charge_control_end_threshold', '') or r('charge_stop_threshold', 'N/A')
+    threshold_str = f"Start: {start_t}% / Stop: {stop_t}%" if start_t != 'N/A' and stop_t != 'N/A' else "Not configured"
+
+    return {
+        'bat_name': os.path.basename(base),
+        'status': status,
+        'capacity': capacity,
+        'now_wh': now_wh,
+        'full_wh': full_wh,
+        'design_wh': design_wh,
+        'health': health,
+        'wear': wear,
+        'power_w': power_w,
+        'voltage_v': voltage_v,
+        'design_v': design_v,
+        'cycles': cycles,
+        'time_str': time_str,
+        'condition': condition,
+        'cond_color': cond_color,
+        'mfr': r('manufacturer', 'Unknown'),
+        'model': r('model_name', 'Unknown'),
+        'tech': r('technology', 'Li-Polymer'),
+        'serial': r('serial_number', 'N/A'),
+        'thresholds': threshold_str,
+    }
+
+
+def make_bar(percent, width=30):
+    percent = max(0.0, min(100.0, percent))
+    filled = int(round((percent / 100.0) * width))
+    empty = width - filled
+    return "■" * filled + "·" * empty
+
+
+def print_static(data):
+    if not data:
+        print("Error: No battery detected in /sys/class/power_supply/")
+        return
+
+    # ANSI Colors
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RESET = "\033[0m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+
+    h_color = GREEN if data['health'] >= 75 else (YELLOW if data['health'] >= 45 else RED)
+    s_color = GREEN if data['status'] == 'Charging' else (CYAN if data['status'] == 'Full' else YELLOW)
+
+    print(f"\n{BOLD}{CYAN}╭────────────────────────────────────────────────────────────────────────╮{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET}  {BOLD}BATTERY HEALTH & DIAGNOSTICS{RESET}  {DIM}({data['bat_name']} • {data['mfr']} {data['model']}){RESET}{' ' * max(0, 31 - len(data['mfr']) - len(data['model']))}{BOLD}{CYAN}│{RESET}")
+    print(f"{BOLD}{CYAN}├────────────────────────────────────────────────────────────────────────┤{RESET}")
+    
+    # Progress Bars
+    h_bar = make_bar(data['health'], 30)
+    c_bar = make_bar(data['capacity'], 30)
+    
+    print(f"{BOLD}{CYAN}│{RESET}  {BOLD}Health:{RESET}  [{h_color}{h_bar}{RESET}]  {h_color}{data['health']:5.1f}%{RESET}  ({h_color}{data['condition']}{RESET})")
+    print(f"{BOLD}{CYAN}│{RESET}  {BOLD}Charge:{RESET}  [{s_color}{c_bar}{RESET}]  {s_color}{data['capacity']:5d}%{RESET}  ({data['status']})")
+    print(f"{BOLD}{CYAN}├────────────────────────────────────┬───────────────────────────────────┤{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET} {BOLD}HEALTH & CAPACITY{RESET}                  {BOLD}{CYAN}│{RESET} {BOLD}CURRENT ELECTRICAL STATUS{RESET}         {BOLD}{CYAN}│{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET}  Full Capacity:   {BOLD}{data['full_wh']:6.2f} Wh{RESET}      {BOLD}{CYAN}│{RESET}  Current State:   {s_color}{data['status']:<15}{RESET} {BOLD}{CYAN}│{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET}  Design Capacity: {BOLD}{data['design_wh']:6.2f} Wh{RESET}      {BOLD}{CYAN}│{RESET}  Power Draw:      {BOLD}{data['power_w']:5.2f} W{RESET}         {BOLD}{CYAN}│{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET}  Capacity Lost:   {RED}{data['wear']:5.1f}%{RESET}          {BOLD}{CYAN}│{RESET}  Voltage:         {BOLD}{data['voltage_v']:5.2f} V{RESET} (Min {data['design_v']:.1f}V){BOLD}{CYAN}│{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET}  Cycle Count:     {BOLD}{data['cycles']:<5}{RESET} cycles     {BOLD}{CYAN}│{RESET}  Runtime Est.:    {BOLD}{data['time_str']:<17}{RESET}{BOLD}{CYAN}│{RESET}")
+    print(f"{BOLD}{CYAN}├────────────────────────────────────┴───────────────────────────────────┤{RESET}")
+    print(f"{BOLD}{CYAN}│{RESET}  {DIM}Hardware:{RESET} {data['mfr']} {data['model']} ({data['tech']}) • {DIM}Thresholds:{RESET} {data['thresholds']}")
+    print(f"{BOLD}{CYAN}╰────────────────────────────────────────────────────────────────────────╯{RESET}\n")
+
+
+def curses_tui(stdscr):
+    curses.curs_set(0)
+    stdscr.nodelay(True)
+    curses.use_default_colors()
+
+    # Color pairs
+    curses.init_pair(1, curses.COLOR_GREEN, -1)
+    curses.init_pair(2, curses.COLOR_YELLOW, -1)
+    curses.init_pair(3, curses.COLOR_RED, -1)
+    curses.init_pair(4, curses.COLOR_CYAN, -1)
+    curses.init_pair(5, curses.COLOR_WHITE, -1)
+
+    while True:
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        data = read_battery_data()
+
+        if not data:
+            stdscr.addstr(2, 2, "No battery detected in /sys/class/power_supply/", curses.color_pair(3))
+            stdscr.refresh()
+            time.sleep(2)
+            continue
+
+        h_pair = curses.color_pair(1) if data['health'] >= 75 else (curses.color_pair(2) if data['health'] >= 45 else curses.color_pair(3))
+        s_pair = curses.color_pair(1) if data['status'] == 'Charging' else (curses.color_pair(4) if data['status'] == 'Full' else curses.color_pair(2))
+
+        # Title
+        title = f" BATTERY HEALTH MONITOR  ({data['bat_name']} • {data['mfr']} {data['model']}) "
+        stdscr.addstr(1, max(2, (w - len(title)) // 2), title, curses.A_BOLD | curses.color_pair(4))
+
+        # Gauge bars (responsive to width)
+        bar_w = min(40, max(15, w - 38))
+        h_bar = make_bar(data['health'], bar_w)
+        c_bar = make_bar(data['capacity'], bar_w)
+
+        row = 3
+        stdscr.addstr(row, 3, "Health: ", curses.A_BOLD)
+        stdscr.addstr(row, 11, f"[{h_bar}] ", h_pair)
+        stdscr.addstr(row, 13 + bar_w, f"{data['health']:5.1f}% ", curses.A_BOLD | h_pair)
+        stdscr.addstr(row, 20 + bar_w, f"({data['condition']})", h_pair)
+
+        row += 1
+        stdscr.addstr(row, 3, "Charge: ", curses.A_BOLD)
+        stdscr.addstr(row, 11, f"[{c_bar}] ", s_pair)
+        stdscr.addstr(row, 13 + bar_w, f"{data['capacity']:5d}% ", curses.A_BOLD | s_pair)
+        stdscr.addstr(row, 20 + bar_w, f"({data['status']})", s_pair)
+
+        # Separator
+        row += 2
+        sep_w = min(w - 6, 74)
+        stdscr.addstr(row, 3, "─" * sep_w, curses.A_DIM)
+
+        # 2-column details
+        col1 = 4
+        col2 = min(col1 + 38, max(col1 + 25, w // 2 + 2))
+
+        row += 1
+        stdscr.addstr(row, col1, "CAPACITY & LIFESPAN", curses.A_BOLD | curses.color_pair(4))
+        if col2 < w - 20:
+            stdscr.addstr(row, col2, "CURRENT ACTIVITY", curses.A_BOLD | curses.color_pair(4))
+
+        row += 1
+        stdscr.addstr(row, col1, f"Remaining Full:   {data['full_wh']:6.2f} Wh", curses.A_NORMAL)
+        if col2 < w - 20:
+            stdscr.addstr(row, col2, f"Power Rate:     {data['power_w']:5.2f} W", curses.A_NORMAL)
+
+        row += 1
+        stdscr.addstr(row, col1, f"Factory Design:   {data['design_wh']:6.2f} Wh", curses.A_NORMAL)
+        if col2 < w - 20:
+            stdscr.addstr(row, col2, f"Voltage:        {data['voltage_v']:5.2f} V", curses.A_NORMAL)
+
+        row += 1
+        stdscr.addstr(row, col1, f"Degradation/Wear: ", curses.A_NORMAL)
+        stdscr.addstr(row, col1 + 18, f"{data['wear']:5.1f}% lost", curses.A_BOLD | (curses.color_pair(3) if data['wear'] > 40 else curses.color_pair(2)))
+        if col2 < w - 20:
+            stdscr.addstr(row, col2, f"Time Estimate:  ", curses.A_NORMAL)
+            stdscr.addstr(row, col2 + 16, f"{data['time_str']}", curses.A_BOLD)
+
+        row += 1
+        stdscr.addstr(row, col1, f"Cycle Count:      {data['cycles']} cycles", curses.A_NORMAL)
+        if col2 < w - 20:
+            stdscr.addstr(row, col2, f"State:          {data['status']}", s_pair)
+
+        # Hardware & footer
+        row += 2
+        stdscr.addstr(row, 3, "─" * sep_w, curses.A_DIM)
+        row += 1
+        meta_line = f"Technology: {data['tech']}  •  Thresholds: {data['thresholds']}"
+        stdscr.addstr(row, 3, meta_line[:w-6], curses.A_DIM)
+
+        row += 2
+        footer = " [q / Esc] Quit    [r] Refresh now    (Auto-updates every 1.5s) "
+        stdscr.addstr(min(h - 1, row), max(2, (w - len(footer)) // 2), footer, curses.A_REVERSE | curses.A_DIM)
+
+        stdscr.refresh()
+
+        # Input loop with 1.5s timeout
+        start = time.time()
+        while time.time() - start < 1.5:
+            ch = stdscr.getch()
+            if ch in (ord('q'), ord('Q'), 27):  # 27 is Esc
+                return
+            elif ch in (ord('r'), ord('R')):
+                break
+            time.sleep(0.05)
+
+
+def main():
+    if '--help' in sys.argv or '-h' in sys.argv:
+        print("Usage: battery-health [OPTIONS]")
+        print("Interactive, clean TUI for inspecting laptop battery health and charge.\n")
+        print("Options:")
+        print("  -s, --static    Print static summary and exit immediately (no interactive TUI)")
+        print("  -h, --help      Show this help message")
+        sys.exit(0)
+
+    if '--static' in sys.argv or '-s' in sys.argv or not sys.stdout.isatty():
+        data = read_battery_data()
+        print_static(data)
+    else:
+        try:
+            curses.wrapper(curses_tui)
+        except KeyboardInterrupt:
+            pass
+
+
+if __name__ == '__main__':
+    main()

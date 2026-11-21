@@ -8,16 +8,9 @@ fi
 
 LOCK_IMG="/tmp/swaylock-battery.png"
 
-# Ensure image exists (generates synchronously only if missing on fresh boot)
-if [ ! -f "$LOCK_IMG" ]; then
-    if [ -x "$HOME/.local/bin/generate-swaylock-bg" ]; then
-        "$HOME/.local/bin/generate-swaylock-bg" --force
-    fi
-fi
-
-# Queue asynchronous background refresh so future locks remain up-to-date
+# Always ensure battery lock image reflects current status
 if [ -x "$HOME/.local/bin/generate-swaylock-bg" ]; then
-    "$HOME/.local/bin/generate-swaylock-bg" >/dev/null 2>&1 &
+    "$HOME/.local/bin/generate-swaylock-bg"
 fi
 
 if [ -f "$LOCK_IMG" ]; then
